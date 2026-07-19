@@ -36,6 +36,16 @@ Internet geschickt** – alles läuft nur bei dir.
     ein zweiter Klick öffnet ihre Karteikarte.
   - **Automatische Vorschläge**: Figuren, die oft zusammen in Szenen auftauchen,
     aber noch nicht verbunden sind, werden vorgeschlagen.
+  - **Gewichtung**: Bindungsstärke (lose / mittel / eng → Liniendicke) und
+    Tonalität (harmonisch 💚 / neutral / konfliktreich ⚡, konfliktreiche Linien
+    gestrichelt).
+  - **Entwicklung über die Handlung**: Halte Wendepunkte pro Kapitel fest
+    (neue Stärke, Tonalität, Bezeichnung) und optional, ab wann eine Beziehung
+    besteht. Der Regler **„Stand der Handlung"** zeigt das Geflecht so, wie es bis
+    zu einem gewählten Kapitel aussieht.
+  - **Frei anordnen**: Figuren im Diagramm lassen sich mit der Maus verschieben;
+    die Anordnung wird gespeichert („Anordnung zurücksetzen" stellt den Kreis
+    wieder her).
 - **Volltextsuche** – Das Suchfeld links durchsucht Szenen, Figuren, Orte,
   Elemente, Ideen und Notizen; ein Klick springt zum Treffer.
 - **Tagesziel** – Optionales Wort-Tagesziel mit Fortschrittsring auf der

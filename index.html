@@ -390,6 +390,32 @@ const REL_CATEGORIES = [
 ];
 function catOf(id){ return REL_CATEGORIES.find(c=>c.id===id)||REL_CATEGORIES[6]; }
 
+/* Stärke & Tonalität einer Beziehung */
+const REL_STRENGTHS = [{v:1,label:"lose"},{v:2,label:"mittel"},{v:3,label:"eng"}];
+const STRENGTH_WIDTH = {1:1.5, 2:3, 3:5};
+const REL_TENSIONS = [
+  {id:"warm",   label:"Harmonisch",     icon:"💚"},
+  {id:"neutral",label:"Neutral",        icon:"",  },
+  {id:"cold",   label:"Konfliktreich",  icon:"⚡"},
+];
+function tensionOf(id){ return REL_TENSIONS.find(t=>t.id===id)||REL_TENSIONS[1]; }
+function chapterIndexOf(chId){ return proj().chapters.findIndex(c=>c.id===chId); }
+// Effektiver Zustand einer Beziehung zu einem Handlungszeitpunkt (null = Aktuell/Gesamt)
+function effectiveRel(r, uptoIdx){
+  const base={label:r.label||"", strength:r.strength||2, tension:r.tension||"neutral", visible:true};
+  if(uptoIdx===null) return base;
+  // "besteht ab" – vor diesem Kapitel existiert die Beziehung noch nicht
+  if(r.startCh){ const si=chapterIndexOf(r.startCh); if(si>=0 && si>uptoIdx) return {visible:false}; }
+  const stages=(r.stages||[]).filter(s=>s.ch && chapterIndexOf(s.ch)>=0)
+    .sort((a,b)=>chapterIndexOf(a.ch)-chapterIndexOf(b.ch));
+  const applicable=stages.filter(s=>chapterIndexOf(s.ch)<=uptoIdx);
+  if(!applicable.length) return base; // Grundform gilt von Beginn an
+  const cur=applicable[applicable.length-1];
+  return { label:cur.label||base.label, strength:cur.strength||base.strength,
+           tension:cur.tension||base.tension, visible:true, stageNote:cur.note||"" };
+}
+function graphPos(){ const p=proj(); if(!p.graphPos) p.graphPos={}; return p.graphPos; }
+
 /* ---------- Handlungsstränge (Farb-Etiketten) ---------- */
 const THREAD_COLORS = ["#c0566b","#3f6f8f","#5c7a4a","#b58a3c","#7a5c9e","#c77d3c","#4aa0a0","#a4443a"];
 function threads(){ const p=proj(); if(!p.threads) p.threads=[]; return p.threads; }
@@ -969,7 +995,7 @@ function openEntity(id){
       <div>
         <div class="lbl" style="font-size:12px;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.5px">Beziehungen</div>
         <div class="link-list" style="margin-top:6px">
-          ${rels.length? rels.map(r=>`<div><span class="rel-cat" style="background:${catOf(r.category).color};margin-right:5px"></span><span class="muted">${esc(r.label||"verbunden mit")}</span> <span class="lk" data-ent="${r.otherId}">${esc(r.otherName)}</span></div>`).join("")
+          ${rels.length? rels.map(r=>`<div><span class="rel-cat" style="background:${catOf(r.category).color};margin-right:5px"></span><span class="muted">${esc(r.label||"verbunden mit")} ${tensionOf(r.tension).icon}</span> <span class="lk" data-ent="${r.otherId}">${esc(r.otherName)}</span></div>`).join("")
             : '<span class="muted">Noch keine Beziehungen. <span class="lk" data-relnew="1">anlegen</span></span>'}
         </div>
       </div>
@@ -1006,7 +1032,8 @@ function relationsOf(id){
   }
   return out;
 }
-let REL_FOCUS = null; // Fokus-Knoten im Graph
+let REL_FOCUS = null;   // Fokus-Knoten im Graph
+let REL_CHAPTER = null; // Handlungs-Zeitpunkt (Kapitel-Index) oder null = gesamt
 VIEWS.relations = ()=>{
   const p=proj(); const m=mount();
   const nodes = [...p.characters, ...p.places, ...p.elements];
@@ -1030,14 +1057,28 @@ VIEWS.relations = ()=>{
         <button class="btn ghost small" data-ignore="${s.a.id}:${s.b.id}" title="Vorschlag ausblenden">✕</button>
       </div>`).join("")}</div>`:"";
 
+  const chapters=p.chapters.filter(c=>c.scenes.length||true);
+  const chapterOpts=`<option value="">Aktueller Stand (gesamt)</option>`+
+    chapters.map((c,i)=>`<option value="${i}" ${REL_CHAPTER===i?"selected":""}>bis „${esc(c.title||("Kapitel "+(i+1)))}"</option>`).join("");
+  const hasPos=Object.keys(graphPos()).length>0;
   m.innerHTML+=suggHtml+
-    `${REL_FOCUS?`<div class="row" style="margin-bottom:8px"><span class="pill">Fokus: ${esc(findEntity(REL_FOCUS)?.name||"")}</span>
-       <button class="btn ghost small" id="clearFocus">Fokus aufheben</button></div>`:""}
+    `<div class="row wrap" style="margin-bottom:12px;gap:10px">
+       ${chapters.length?`<label class="row" style="gap:6px"><span class="muted" style="font-size:13px">🎬 Stand der Handlung:</span>
+         <select class="status-sel" id="relChapter">${chapterOpts}</select></label>`:""}
+       ${REL_FOCUS?`<span class="pill">Fokus: ${esc(findEntity(REL_FOCUS)?.name||"")}</span>
+         <button class="btn ghost small" id="clearFocus">Fokus aufheben</button>`:""}
+       <div class="spacer" style="flex:1"></div>
+       ${hasPos?`<button class="btn ghost small" id="resetLayout" title="Knoten wieder im Kreis anordnen">Anordnung zurücksetzen</button>`:""}
+     </div>
+     ${REL_CHAPTER!==null?`<p class="muted" style="font-size:13px;margin:-4px 0 10px">Zeigt die Beziehungen, wie sie bis zu diesem Kapitel bestehen. Noch nicht entstandene Beziehungen werden ausgeblendet.</p>`:""}
     <div class="graph-wrap" style="margin-bottom:22px"><div id="graph"></div><div id="legend"></div></div>
+    <p class="muted" style="font-size:12px;margin:-14px 0 20px">Tipp: Figuren im Diagramm lassen sich mit der Maus verschieben. Ein Klick hebt das Geflecht hervor, ein zweiter öffnet die Karteikarte.</p>
     <h3 style="font-family:var(--serif)">Alle Verbindungen</h3>
     <div id="relList"></div>`;
   m.querySelector("#addRel").onclick=()=>openRelForm(null);
   const cf=m.querySelector("#clearFocus"); if(cf) cf.onclick=()=>{ REL_FOCUS=null; VIEWS.relations(); };
+  const rc=m.querySelector("#relChapter"); if(rc) rc.onchange=e=>{ REL_CHAPTER=e.target.value===""?null:+e.target.value; VIEWS.relations(); };
+  const rlBtn=m.querySelector("#resetLayout"); if(rlBtn) rlBtn.onclick=()=>{ p.graphPos={}; save(); VIEWS.relations(); };
   m.querySelectorAll("[data-sugg]").forEach(b=>b.onclick=()=>{ const[a,c]=b.dataset.sugg.split(":"); openRelForm(null,a,c); });
   m.querySelectorAll("[data-ignore]").forEach(b=>b.onclick=()=>{
     if(!p._ignoredSugg) p._ignoredSugg=[]; p._ignoredSugg.push(b.dataset.ignore); save(); VIEWS.relations();
@@ -1048,12 +1089,15 @@ VIEWS.relations = ()=>{
   if(p.relationships.length===0){ rl.innerHTML='<p class="muted">Noch keine Beziehungen angelegt.</p>'; }
   else rl.innerHTML=p.relationships.map(r=>{
     const a=findEntity(r.from), b=findEntity(r.to); if(!a||!b) return "";
-    const cat=catOf(r.category);
+    const cat=catOf(r.category); const str=REL_STRENGTHS.find(s=>s.v===(r.strength||2));
+    const ten=tensionOf(r.tension); const stages=(r.stages||[]).length;
     return `<div class="rel-item">
       <span class="rel-cat" style="background:${cat.color}" title="${cat.label}"></span>
       <span class="lk" data-ent="${a.id}" style="color:var(--accent);cursor:pointer">${esc(a.name)}</span>
-      <span class="muted">— ${esc(r.label||"verbunden mit")} →</span>
+      <span class="muted">— ${esc(r.label||"verbunden mit")} ${ten.icon} →</span>
       <span class="lk" data-ent="${b.id}" style="color:var(--accent);cursor:pointer">${esc(b.name)}</span>
+      <span class="tag" style="margin-left:6px">Bindung: ${str?str.label:"mittel"}</span>
+      ${stages?`<span class="tag" title="${stages} Wendepunkt(e) im Verlauf">📈 ${stages}</span>`:""}
       <div class="spacer" style="flex:1"></div>
       <button class="btn ghost small" data-edit="${r.id}">bearbeiten</button>
       <button class="btn ghost small" data-del="${r.id}">🗑</button>
@@ -1092,10 +1136,13 @@ function renderLegend(el){
 function openRelForm(relId, presetFrom, presetTo){
   const p=proj();
   const rel = relId? p.relationships.find(r=>r.id===relId)
-    : {id:uid(), from:presetFrom||"", to:presetTo||"", category:"family", label:"", labelRev:""};
+    : {id:uid(), from:presetFrom||"", to:presetTo||"", category:"family", label:"", labelRev:"", strength:2, tension:"neutral", stages:[]};
   const opts=(sel)=>[...p.characters,...p.places,...p.elements]
     .map(e=>`<option value="${e.id}" ${sel===e.id?"selected":""}>${esc(e.name)}</option>`).join("");
   const catOpts=REL_CATEGORIES.map(c=>`<option value="${c.id}" ${rel.category===c.id?"selected":""}>${c.label}</option>`).join("");
+  const strOpts=REL_STRENGTHS.map(s=>`<option value="${s.v}" ${(rel.strength||2)===s.v?"selected":""}>${s.label}</option>`).join("");
+  const tenOpts=REL_TENSIONS.map(t=>`<option value="${t.id}" ${(rel.tension||"neutral")===t.id?"selected":""}>${t.icon?t.icon+" ":""}${t.label}</option>`).join("");
+  const stagesLocal=JSON.parse(JSON.stringify(rel.stages||[]));
   modal(`<h3>${relId?"Beziehung bearbeiten":"Neue Beziehung"}</h3>
     <div class="two">
       <label class="f"><span class="lbl">Von</span><select class="in" id="rFrom"><option value="">wählen…</option>${opts(rel.from)}</select></label>
@@ -1106,44 +1153,97 @@ function openRelForm(relId, presetFrom, presetTo){
       <label class="f"><span class="lbl">Bezeichnung (Von → Zu)</span><input class="in" id="rLabel" value="${esc(rel.label||"")}" placeholder="z. B. Mutter von, verliebt in, wohnt in"></label>
       <label class="f"><span class="lbl">Gegenrichtung (Zu → Von, optional)</span><input class="in" id="rLabelRev" value="${esc(rel.labelRev||"")}" placeholder="z. B. Kind von"></label>
     </div>
-    <div class="muted" style="font-size:13px;margin-top:8px">Tipp: Die Gegen-Bezeichnung erscheint auf der Karteikarte der anderen Figur.</div>`,
+    <div class="three">
+      <label class="f"><span class="lbl">Bindungsstärke (Liniendicke)</span><select class="in" id="rStr">${strOpts}</select></label>
+      <label class="f"><span class="lbl">Tonalität</span><select class="in" id="rTen">${tenOpts}</select></label>
+      <label class="f"><span class="lbl">Besteht ab</span><select class="in" id="rStart">
+        <option value="">von Anfang an</option>
+        ${p.chapters.map(c=>`<option value="${c.id}" ${rel.startCh===c.id?"selected":""}>${esc(c.title||"Kapitel")}</option>`).join("")}
+      </select></label>
+    </div>
+    <div class="divider" style="margin:16px 0 6px"></div>
+    <div class="row"><span class="lbl" style="font-size:12px;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.5px">📈 Verlauf (optional)</span></div>
+    <p class="muted" style="font-size:13px;margin:4px 0 8px">Wie verändert sich diese Beziehung im Lauf der Geschichte? Halte Wendepunkte an Kapiteln fest – der „Stand der Handlung"-Regler nutzt sie.</p>
+    <div id="stagesBox"></div>
+    <button type="button" class="btn small" id="addStage" style="margin-top:8px">＋ Wendepunkt</button>`,
     ()=>{
       rel.from=val("rFrom"); rel.to=val("rTo"); rel.category=val("rCat");
       rel.label=val("rLabel"); rel.labelRev=val("rLabelRev");
+      rel.strength=+val("rStr")||2; rel.tension=val("rTen")||"neutral"; rel.startCh=val("rStart");
+      rel.stages=readStages();
       if(!rel.from||!rel.to||rel.from===rel.to){ toast("Bitte zwei verschiedene Einträge wählen."); return false; }
       if(!relId) p.relationships.push(rel);
       save(); VIEWS.relations();
+    },
+    (root)=>{
+      const box=root.querySelector("#stagesBox");
+      const chOpts=(sel)=>p.chapters.map(c=>`<option value="${c.id}" ${sel===c.id?"selected":""}>${esc(c.title||"Kapitel")}</option>`).join("");
+      const strSel=(sel)=>REL_STRENGTHS.map(s=>`<option value="${s.v}" ${(sel||2)===s.v?"selected":""}>${s.label}</option>`).join("");
+      const tenSel=(sel)=>REL_TENSIONS.map(t=>`<option value="${t.id}" ${(sel||"neutral")===t.id?"selected":""}>${t.label}</option>`).join("");
+      const drawStages=()=>{
+        if(!p.chapters.length){ box.innerHTML='<p class="muted" style="font-size:13px">Lege zuerst Kapitel/Szenen an, um Wendepunkte zu verorten.</p>'; return; }
+        box.innerHTML=stagesLocal.map((s,i)=>`<div class="card" data-si="${i}" style="padding:10px 12px;margin-bottom:8px">
+          <div class="row wrap" style="gap:8px">
+            <select class="in stg-ch" style="flex:1;min-width:120px">${chOpts(s.ch)}</select>
+            <select class="in stg-str" style="width:110px">${strSel(s.strength)}</select>
+            <select class="in stg-ten" style="width:130px">${tenSel(s.tension)}</select>
+            <button type="button" class="btn ghost small stg-del">🗑</button>
+          </div>
+          <div class="two" style="margin-top:8px">
+            <input class="in stg-label" placeholder="Neue Bezeichnung (optional)" value="${esc(s.label||"")}">
+            <input class="in stg-note" placeholder="Was passiert? z. B. Vertrauen zerbricht" value="${esc(s.note||"")}">
+          </div>
+        </div>`).join("");
+        box.querySelectorAll(".stg-del").forEach((b,i)=>b.onclick=()=>{ syncStages(); stagesLocal.splice(i,1); drawStages(); });
+      };
+      const syncStages=()=>{ box.querySelectorAll("[data-si]").forEach((c,i)=>{
+        stagesLocal[i]={ ch:c.querySelector(".stg-ch").value, strength:+c.querySelector(".stg-str").value,
+          tension:c.querySelector(".stg-ten").value, label:c.querySelector(".stg-label").value,
+          note:c.querySelector(".stg-note").value }; }); };
+      root._readStages=()=>{ syncStages(); return stagesLocal.filter(s=>s.ch); };
+      root.querySelector("#addStage").onclick=()=>{ if(!p.chapters.length){ toast("Zuerst Kapitel anlegen."); return; }
+        syncStages(); stagesLocal.push({ch:p.chapters[0].id, strength:2, tension:"neutral", note:""}); drawStages(); };
+      drawStages();
     });
+  function readStages(){ const root=document.querySelector("#modalRoot .modal"); return root&&root._readStages?root._readStages():[]; }
 }
 function drawGraph(container, nodes){
-  const p=proj();
-  const W=container.clientWidth||760, H=Math.max(320, Math.min(560, 140+nodes.length*26));
-  const cx=W/2, cy=H/2, R=Math.min(W,H)/2-70;
+  const p=proj(); const gp=graphPos();
+  const W=container.clientWidth||760, H=Math.max(340, Math.min(600, 160+nodes.length*26));
+  const cx=W/2, cy=H/2, R=Math.min(W,H)/2-72;
   const pos={};
   nodes.forEach((n,i)=>{
-    const ang=(i/nodes.length)*Math.PI*2 - Math.PI/2;
-    pos[n.id]={x:cx+R*Math.cos(ang), y:cy+R*Math.sin(ang), n};
+    if(gp[n.id]){ pos[n.id]={x:gp[n.id].x*W, y:gp[n.id].y*H}; }
+    else{ const ang=(i/nodes.length)*Math.PI*2 - Math.PI/2;
+      pos[n.id]={x:cx+R*Math.cos(ang), y:cy+R*Math.sin(ang)}; }
   });
+  // effektive Zustände je Beziehung zum gewählten Handlungs-Stand
+  const eff={};
+  p.relationships.forEach(r=>{ eff[r.id]=effectiveRel(r, REL_CHAPTER); });
+  const visibleRels=p.relationships.filter(r=>pos[r.from]&&pos[r.to]&&eff[r.id].visible);
   const focusSet=new Set();
   if(REL_FOCUS){ focusSet.add(REL_FOCUS);
-    p.relationships.forEach(r=>{ if(r.from===REL_FOCUS) focusSet.add(r.to); if(r.to===REL_FOCUS) focusSet.add(r.from); }); }
-  const edges=p.relationships.map(r=>{
-    if(!pos[r.from]||!pos[r.to]) return "";
-    const a=pos[r.from], b=pos[r.to];
+    visibleRels.forEach(r=>{ if(r.from===REL_FOCUS) focusSet.add(r.to); if(r.to===REL_FOCUS) focusSet.add(r.from); }); }
+
+  const edgeSvg=(r)=>{
+    const a=pos[r.from], b=pos[r.to]; const e=eff[r.id];
     const dx=b.x-a.x, dy=b.y-a.y, len=Math.hypot(dx,dy)||1; const ux=dx/len, uy=dy/len;
     const x1=a.x+ux*24, y1=a.y+uy*24, x2=b.x-ux*26, y2=b.y-uy*26;
     const mx=(x1+x2)/2, my=(y1+y2)/2;
-    const col=catOf(r.category).color;
+    const col=catOf(r.category).color; const w=STRENGTH_WIDTH[e.strength]||3;
+    const dash=e.tension==="cold"?'stroke-dasharray="6 4"':'';
     const hi=REL_FOCUS&&(r.from===REL_FOCUS||r.to===REL_FOCUS)?" hi":"";
-    // Pfeilspitze
-    const ah=8, ang=Math.atan2(uy,ux);
+    const ah=7+w, ang=Math.atan2(uy,ux);
     const p1x=x2-ah*Math.cos(ang-0.4), p1y=y2-ah*Math.sin(ang-0.4);
     const p2x=x2-ah*Math.cos(ang+0.4), p2y=y2-ah*Math.sin(ang+0.4);
-    return `<line class="edge${hi}" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${col}"></line>
+    const icon=tensionOf(e.tension).icon;
+    const lbl=((e.label||"")+(icon?" "+icon:"")).slice(0,24);
+    return `<g class="edge-g" data-from="${r.from}" data-to="${r.to}">
+      <line class="edge${hi}" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${col}" stroke-width="${w}" ${dash}></line>
       <polygon class="arrow${hi}" points="${x2},${y2} ${p1x},${p1y} ${p2x},${p2y}" fill="${col}"></polygon>
-      <text class="edge-label${hi}" x="${mx}" y="${my-4}" text-anchor="middle">${esc((r.label||"").slice(0,22))}</text>`;
-  }).join("");
-  const nodeSvg=nodes.map(n=>{
+      <text class="edge-label${hi}" x="${mx}" y="${my-5}" text-anchor="middle">${esc(lbl)}</text></g>`;
+  };
+  const nodeSvg=(n)=>{
     const pt=pos[n.id]; const isChar=p.characters.some(c=>c.id===n.id);
     const isElem=p.elements.some(c=>c.id===n.id);
     const lbl=n.name.length>16?n.name.slice(0,15)+"…":n.name;
@@ -1151,15 +1251,57 @@ function drawGraph(container, nodes){
     const glyph=isChar?initials(n.name):(isElem?"✦":"◈");
     return `<g class="node${hi}" data-ent="${n.id}">
       <circle cx="${pt.x}" cy="${pt.y}" r="22"></circle>
-      <text x="${pt.x}" y="${pt.y+4}" text-anchor="middle" font-family="var(--serif)" font-weight="600">${glyph}</text>
-      <text x="${pt.x}" y="${pt.y+38}" text-anchor="middle">${esc(lbl)}</text>
-    </g>`;
-  }).join("");
-  container.innerHTML=`<svg class="graph ${REL_FOCUS?'focused':''}" viewBox="0 0 ${W} ${H}" style="height:${H}px">${edges}${nodeSvg}</svg>`;
-  container.querySelectorAll(".node").forEach(g=>g.onclick=()=>{
-    const id=g.dataset.ent;
-    if(REL_FOCUS===id) openEntity(id);       // zweiter Klick öffnet die Karteikarte
-    else { REL_FOCUS=id; VIEWS.relations(); } // erster Klick fokussiert
+      <text class="glyph" x="${pt.x}" y="${pt.y+4}" text-anchor="middle" font-family="var(--serif)" font-weight="600">${glyph}</text>
+      <text class="name" x="${pt.x}" y="${pt.y+38}" text-anchor="middle">${esc(lbl)}</text></g>`;
+  };
+  container.innerHTML=`<svg class="graph ${REL_FOCUS?'focused':''}" viewBox="0 0 ${W} ${H}" style="height:${H}px;touch-action:none">
+    ${visibleRels.map(edgeSvg).join("")}${nodes.map(nodeSvg).join("")}</svg>`;
+  const svg=container.querySelector("svg");
+
+  // Position eines Knotens live aktualisieren (ohne Neuaufbau)
+  const updateNode=(id)=>{
+    const pt=pos[id];
+    const g=svg.querySelector(`.node[data-ent="${id}"]`); if(!g) return;
+    g.querySelector("circle").setAttribute("cx",pt.x); g.querySelector("circle").setAttribute("cy",pt.y);
+    const gl=g.querySelector(".glyph"); gl.setAttribute("x",pt.x); gl.setAttribute("y",pt.y+4);
+    const nm=g.querySelector(".name"); nm.setAttribute("x",pt.x); nm.setAttribute("y",pt.y+38);
+    svg.querySelectorAll(".edge-g").forEach(eg=>{
+      if(eg.dataset.from!==id && eg.dataset.to!==id) return;
+      const a=pos[eg.dataset.from], b=pos[eg.dataset.to];
+      const dx=b.x-a.x, dy=b.y-a.y, len=Math.hypot(dx,dy)||1, ux=dx/len, uy=dy/len;
+      const x1=a.x+ux*24, y1=a.y+uy*24, x2=b.x-ux*26, y2=b.y-uy*26;
+      const ln=eg.querySelector("line"); const w=+ln.getAttribute("stroke-width")||3;
+      ln.setAttribute("x1",x1);ln.setAttribute("y1",y1);ln.setAttribute("x2",x2);ln.setAttribute("y2",y2);
+      const ah=7+w, ang=Math.atan2(uy,ux);
+      eg.querySelector("polygon").setAttribute("points",
+        `${x2},${y2} ${x2-ah*Math.cos(ang-0.4)},${y2-ah*Math.sin(ang-0.4)} ${x2-ah*Math.cos(ang+0.4)},${y2-ah*Math.sin(ang+0.4)}`);
+      const t=eg.querySelector("text"); t.setAttribute("x",(x1+x2)/2); t.setAttribute("y",(y1+y2)/2-5);
+    });
+  };
+  const toSvg=(ev)=>{ const rect=svg.getBoundingClientRect();
+    return { x:(ev.clientX-rect.left)*(W/rect.width), y:(ev.clientY-rect.top)*(H/rect.height) }; };
+
+  let drag=null, moved=false;
+  svg.querySelectorAll(".node").forEach(g=>{
+    g.style.cursor="grab";
+    g.addEventListener("pointerdown",ev=>{
+      ev.preventDefault(); const id=g.dataset.ent; const s=toSvg(ev);
+      drag={id, dx:s.x-pos[id].x, dy:s.y-pos[id].y}; moved=false;
+      g.setPointerCapture(ev.pointerId); g.style.cursor="grabbing";
+    });
+    g.addEventListener("pointermove",ev=>{
+      if(!drag) return; const s=toSvg(ev);
+      const nx=Math.max(26,Math.min(W-26, s.x-drag.dx)), ny=Math.max(26,Math.min(H-30, s.y-drag.dy));
+      if(Math.abs(nx-pos[drag.id].x)>2||Math.abs(ny-pos[drag.id].y)>2) moved=true;
+      pos[drag.id]={x:nx,y:ny}; updateNode(drag.id);
+    });
+    g.addEventListener("pointerup",ev=>{
+      g.style.cursor="grab";
+      if(drag && moved){ gp[drag.id]={x:pos[drag.id].x/W, y:pos[drag.id].y/H}; save(); VIEWS.relations(); drag=null; return; }
+      // Klick (ohne Ziehen): fokussieren / öffnen
+      const id=g.dataset.ent; drag=null;
+      if(REL_FOCUS===id) openEntity(id); else { REL_FOCUS=id; VIEWS.relations(); }
+    });
   });
 }
 
