@@ -14,8 +14,12 @@ Internet geschickt** – alles läuft nur bei dir.
 
 - **Übersicht** – Titel, Logline, Prämisse, Genre und dein Fortschritt auf einen Blick.
 - **Manuskript** – Schreibe in Kapiteln und Szenen (wie ein Karteikasten). Jede
-  Szene hat eine Kurzzusammenfassung, einen Status (Idee / Entwurf / Fertig) und
-  eine Perspektivfigur (POV).
+  Szene hat eine Kurzzusammenfassung, einen Status (Idee / Entwurf / Fertig), eine
+  Perspektivfigur (POV) und ein Feld „Wann?" für die Handlungszeit.
+  Kapitel und Szenen lassen sich per **Drag & Drop** (am Griff ⠿) umsortieren –
+  auch quer über Kapitel hinweg.
+- **Zeitstrahl** – Zeigt den Verlauf deiner Handlung in Leserichtung: was wann
+  passiert, wer dabei ist und wie weit du bist. Ein Klick springt zur Szene.
 - **Figuren, Orte, Weltelemente** – Karteikarten mit hilfreichen Feldern
   (Ziel, Konflikt, Wandlung …), die dir beim Denken helfen.
 - **Automatische Verknüpfung** – Schreibst du im Szenentext den Namen einer Figur
@@ -27,6 +31,10 @@ Internet geschickt** – alles läuft nur bei dir.
 - **Ideen & Struktur** – Ein Ideenspeicher plus Leitfragen, die dir helfen, aus
   einem Einfall eine Geschichte zu machen, und eine einfache Struktur in 7 Schritten.
 - **Notizen** – ein freier Zettelkasten.
+- **Manuskript-Export** – Über „⤓ Export" im Manuskript verwandelst du deine
+  Szenen in ein durchgehendes, lesbares Dokument: als druckfertige Vorschau
+  (auch „als PDF speichern"), als HTML- oder als reine Textdatei. Szenen kannst
+  du dabei mit ihren Titeln oder mit „* * *" trennen.
 
 ## Wichtig: Speichern & Sichern
 

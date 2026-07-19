@@ -140,6 +140,13 @@
   .scene-item .dot.draft{background:#c9a878}
   .scene-item .dot.done{background:var(--ok)}
   .scene-item .dot.todo{background:var(--line)}
+  .scene-item .grip,.chapter-h .grip{cursor:grab;color:var(--ink-soft);opacity:.4;font-size:12px;
+       user-select:none;flex-shrink:0}
+  .scene-item:hover .grip,.chapter-h:hover .grip{opacity:.8}
+  .scene-item.dragging,.chapter.dragging{opacity:.4}
+  .drop-before{box-shadow:inset 0 2px 0 var(--accent)}
+  .drop-after{box-shadow:inset 0 -2px 0 var(--accent)}
+  .chapter.drop-into{background:var(--accent-bg);border-radius:8px}
   .editor-wrap{overflow-y:auto;display:flex;flex-direction:column}
   .editor-bar{position:sticky;top:0;background:var(--panel);border-bottom:1px solid var(--line);
               padding:10px 22px;display:flex;align-items:center;gap:12px;z-index:5;flex-wrap:wrap}
@@ -171,6 +178,25 @@
   .node text{font-family:var(--sans);font-size:12px;fill:var(--ink);pointer-events:none}
   .edge{stroke:var(--accent-soft);stroke-width:1.5;opacity:.6}
   .edge-label{font-size:10px;fill:var(--ink-soft)}
+
+  /* Timeline */
+  .tl{position:relative;margin-left:6px;padding-left:26px}
+  .tl:before{content:"";position:absolute;left:6px;top:6px;bottom:6px;width:2px;background:var(--line)}
+  .tl-chapter{font-family:var(--serif);font-size:15px;color:var(--ink-soft);text-transform:uppercase;
+       letter-spacing:.6px;margin:22px 0 10px;position:relative}
+  .tl-node{position:relative;margin:0 0 12px}
+  .tl-node:before{content:"";position:absolute;left:-24px;top:16px;width:12px;height:12px;border-radius:50%;
+       background:var(--panel);border:2px solid var(--accent-soft)}
+  .tl-node.done:before{background:var(--ok);border-color:var(--ok)}
+  .tl-node.draft:before{background:var(--accent-soft)}
+  .tl-card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px 14px;
+       box-shadow:var(--shadow);cursor:pointer;transition:border-color .12s}
+  .tl-card:hover{border-color:var(--accent-soft)}
+  .tl-when{display:inline-block;font-size:12px;font-weight:600;color:var(--accent);background:var(--accent-bg);
+       padding:1px 9px;border-radius:20px;margin-bottom:4px}
+  .tl-title{font-family:var(--serif);font-size:17px;font-weight:600}
+  .tl-sum{color:var(--ink-soft);font-size:14px;margin-top:3px}
+  .tl-meta{margin-top:7px;font-size:12px;color:var(--ink-soft)}
 
   /* Dashboard stats */
   .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:12px;margin-bottom:24px}
@@ -351,6 +377,7 @@ const NAV = [
   {id:"places", ico:"🗺️", label:"Orte", count:()=>proj().places.length},
   {id:"elements", ico:"✦", label:"Weltelemente", count:()=>proj().elements.length},
   {id:"relations", ico:"🔗", label:"Beziehungen", count:()=>proj().relationships.length},
+  {id:"timeline", ico:"📅", label:"Zeitstrahl", count:()=>proj().chapters.reduce((a,c)=>a+c.scenes.length,0)},
   {id:"ideas", ico:"💡", label:"Ideen & Struktur", count:()=>proj().ideas.filter(i=>!i.done).length},
   {id:"notes", ico:"🗒️", label:"Notizen"},
 ];
@@ -477,26 +504,113 @@ VIEWS.manuscript = ()=>{
 };
 function renderBinder(){
   const p=proj(); const b=document.getElementById("binder");
-  b.innerHTML = `<h4>Manuskript <span class="spacer"></span></h4>` +
+  b.innerHTML = `<h4>Manuskript <span class="spacer"></span>
+      <button class="btn ghost small" id="exportMs" title="Als lesbares Dokument exportieren">⤓ Export</button></h4>` +
     p.chapters.map(ch=>`
       <div class="chapter" data-ch="${ch.id}">
-        <div class="chapter-h">
+        <div class="chapter-h" draggable="true" data-chdrag="${ch.id}">
+          <span class="grip" title="Kapitel ziehen zum Umsortieren">⠿</span>
           <span class="ttl" data-editch="${ch.id}">${esc(ch.title||"Kapitel")}</span>
           <button class="btn ghost small" data-addsc="${ch.id}" title="Szene hinzufügen">＋</button>
         </div>
         ${ch.scenes.map(sc=>`
-          <div class="scene-item ${EDIT_SCENE&&EDIT_SCENE.sceneId===sc.id?'active':''}" data-open="${ch.id}:${sc.id}">
+          <div class="scene-item ${EDIT_SCENE&&EDIT_SCENE.sceneId===sc.id?'active':''}"
+               draggable="true" data-open="${ch.id}:${sc.id}" data-scid="${sc.id}" data-scch="${ch.id}">
+            <span class="grip" title="Szene ziehen zum Umsortieren">⠿</span>
             <span class="dot ${sc.status||'todo'}"></span>
             <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(sc.title||"Ohne Titel")}</span>
           </div>`).join("")}
       </div>`).join("") +
     `<div style="padding:10px 8px"><button class="btn small" id="addChapter">＋ Kapitel</button></div>`;
   b.querySelector("#addChapter").onclick=addChapter;
+  b.querySelector("#exportMs").onclick=openExport;
   b.querySelectorAll("[data-addsc]").forEach(e=>e.onclick=()=>addScene(e.dataset.addsc));
-  b.querySelectorAll("[data-open]").forEach(e=>e.onclick=()=>{
+  b.querySelectorAll("[data-open]").forEach(e=>e.onclick=(ev)=>{
+    if(ev.target.classList.contains("grip")) return;
     const[c,s]=e.dataset.open.split(":"); EDIT_SCENE={chapterId:c,sceneId:s}; renderBinder(); renderEditor();
   });
   b.querySelectorAll("[data-editch]").forEach(e=>e.onclick=()=>renameChapter(e.dataset.editch));
+  wireBinderDnD(b);
+}
+
+/* ---------- Drag & Drop im Binder ---------- */
+let DRAG=null;
+function wireBinderDnD(b){
+  const clearMarks=()=>b.querySelectorAll(".drop-before,.drop-after,.drop-into,.dragging")
+      .forEach(el=>el.classList.remove("drop-before","drop-after","drop-into","dragging"));
+  // Szenen
+  b.querySelectorAll(".scene-item").forEach(el=>{
+    el.addEventListener("dragstart",e=>{ DRAG={type:"scene",scId:el.dataset.scid,chId:el.dataset.scch};
+      el.classList.add("dragging"); e.stopPropagation(); e.dataTransfer.effectAllowed="move"; });
+    el.addEventListener("dragend",clearMarks);
+    el.addEventListener("dragover",e=>{
+      if(!DRAG||DRAG.type!=="scene") return; e.preventDefault(); e.stopPropagation();
+      const r=el.getBoundingClientRect(); const after=e.clientY>r.top+r.height/2;
+      el.classList.remove("drop-before","drop-after");
+      el.classList.add(after?"drop-after":"drop-before");
+    });
+    el.addEventListener("dragleave",()=>el.classList.remove("drop-before","drop-after"));
+    el.addEventListener("drop",e=>{
+      if(!DRAG||DRAG.type!=="scene") return; e.preventDefault(); e.stopPropagation();
+      const after=el.classList.contains("drop-after");
+      moveScene(DRAG.scId, el.dataset.scch, el.dataset.scid, after); DRAG=null; clearMarks();
+    });
+  });
+  // Kapitel (Drop-Ziel für Szenen: ans Ende; und Kapitel-Reihenfolge)
+  b.querySelectorAll(".chapter").forEach(ch=>{
+    ch.addEventListener("dragover",e=>{
+      if(!DRAG) return; e.preventDefault();
+      if(DRAG.type==="scene") ch.classList.add("drop-into");
+    });
+    ch.addEventListener("dragleave",()=>ch.classList.remove("drop-into"));
+    ch.addEventListener("drop",e=>{
+      if(!DRAG) return;
+      if(DRAG.type==="scene" && !e.target.closest(".scene-item")){
+        e.preventDefault(); moveScene(DRAG.scId, DRAG.chId, null, true, ch.dataset.ch);
+      }
+      ch.classList.remove("drop-into"); if(DRAG&&DRAG.type==="scene") DRAG=null;
+    });
+  });
+  b.querySelectorAll("[data-chdrag]").forEach(h=>{
+    h.addEventListener("dragstart",e=>{ DRAG={type:"chapter",chId:h.dataset.chdrag};
+      h.closest(".chapter").classList.add("dragging"); e.dataTransfer.effectAllowed="move"; });
+    h.addEventListener("dragend",clearMarks);
+    h.addEventListener("dragover",e=>{
+      if(!DRAG||DRAG.type!=="chapter") return; e.preventDefault();
+      const chEl=h.closest(".chapter"); const r=chEl.getBoundingClientRect();
+      chEl.classList.remove("drop-before","drop-after");
+      chEl.classList.add(e.clientY>r.top+r.height/2?"drop-after":"drop-before");
+    });
+    h.addEventListener("dragleave",()=>h.closest(".chapter").classList.remove("drop-before","drop-after"));
+    h.addEventListener("drop",e=>{
+      if(!DRAG||DRAG.type!=="chapter") return; e.preventDefault();
+      const chEl=h.closest(".chapter"); const after=chEl.classList.contains("drop-after");
+      moveChapter(DRAG.chId, chEl.dataset.ch, after); DRAG=null; clearMarks();
+    });
+  });
+}
+function moveScene(scId, targetChId, targetScId, after, intoChId){
+  const p=proj();
+  let sc=null, fromCh=null;
+  for(const ch of p.chapters){ const i=ch.scenes.findIndex(s=>s.id===scId);
+    if(i>=0){ sc=ch.scenes[i]; fromCh=ch; ch.scenes.splice(i,1); break; } }
+  if(!sc) return;
+  if(intoChId){ const ch=p.chapters.find(c=>c.id===intoChId); ch.scenes.push(sc); }
+  else{
+    const ch=p.chapters.find(c=>c.id===targetChId);
+    let idx=ch.scenes.findIndex(s=>s.id===targetScId);
+    if(idx<0) idx=ch.scenes.length; else idx=after?idx+1:idx;
+    ch.scenes.splice(idx,0,sc);
+  }
+  save(); renderBinder();
+}
+function moveChapter(chId, targetChId, after){
+  const p=proj();
+  const i=p.chapters.findIndex(c=>c.id===chId); if(i<0) return;
+  const [ch]=p.chapters.splice(i,1);
+  let idx=p.chapters.findIndex(c=>c.id===targetChId);
+  if(idx<0) idx=p.chapters.length; else idx=after?idx+1:idx;
+  p.chapters.splice(idx,0,ch); save(); renderBinder();
 }
 function renderEditor(){
   const w=document.getElementById("editorWrap");
@@ -515,6 +629,8 @@ function renderEditor(){
         <option value="done" ${sc.status==="done"?"selected":""}>✓ Fertig</option>
       </select>
       <select class="status-sel" id="scPov"><option value="">POV wählen…</option>${povChars}</select>
+      <input class="status-sel" id="scWhen" value="${esc(sc.when||"")}" placeholder="Wann? (Handlungszeit)"
+             style="width:150px" title="z. B. Tag 1, Frühling, Rückblende – erscheint im Zeitstrahl">
       <button class="btn ghost small" id="delScene" title="Szene löschen">🗑</button>
     </div>
     <div class="editor-body">
@@ -533,6 +649,7 @@ function renderEditor(){
   w.querySelector("#scSummary").oninput=debounce(e=>{ sc.summary=e.target.value; save(); },400);
   w.querySelector("#scStatus").onchange=e=>{ sc.status=e.target.value; save(); renderBinder(); };
   w.querySelector("#scPov").onchange=e=>{ sc.pov=e.target.value; save(); };
+  w.querySelector("#scWhen").oninput=debounce(e=>{ sc.when=e.target.value; save(); },400);
   w.querySelector("#delScene").onclick=()=>{
     if(confirm("Diese Szene löschen?")){ ch.scenes=ch.scenes.filter(s=>s.id!==sc.id); EDIT_SCENE=null; save(); VIEWS.manuscript(); }
   };
@@ -898,6 +1015,142 @@ function renderNextPrompt(m,p){
   m.querySelector(".prompt-box .q").textContent="💭 "+PROMPTS[idx];
   m.querySelector("#savePrompt").onclick=()=>{ const el=m.querySelector("#promptAns");
     if(el.value.trim()){ p.ideas.unshift({id:uid(),text:"["+PROMPTS[idx]+"] "+el.value,done:false}); save(); el.value=""; toast("Gespeichert."); VIEWS.ideas(); } };
+}
+
+/* ---------- Zeitstrahl ---------- */
+VIEWS.timeline = ()=>{
+  const p=proj(); const m=mount();
+  const total=p.chapters.reduce((a,c)=>a+c.scenes.length,0);
+  m.innerHTML=`<div class="row"><h2>Zeitstrahl</h2><div class="spacer"></div>
+      <button class="btn small" data-go="manuscript">Zum Manuskript</button></div>
+    <p class="lead">Der Verlauf deiner Handlung in Leserichtung. So siehst du auf einen Blick, was wann passiert, wer dabei ist und wie weit du bist. Trage in einer Szene das Feld „Wann?" ein, um die Handlungszeit anzuzeigen.</p>`;
+  if(total===0){
+    m.innerHTML+=`<div class="empty"><div class="big">📅</div><p>Noch keine Szenen. <span class="lk" data-go="manuscript" style="color:var(--accent);cursor:pointer">Schreib deine erste Szene.</span></p></div>`;
+    m.querySelectorAll("[data-go]").forEach(e=>e.onclick=()=>go(e.dataset.go)); return;
+  }
+  let html='<div class="tl">';
+  p.chapters.forEach(ch=>{
+    if(!ch.scenes.length) return;
+    html+=`<div class="tl-chapter">${esc(ch.title||"Kapitel")}</div>`;
+    ch.scenes.forEach(sc=>{
+      const det=detectInText(sc.text);
+      const pov=sc.pov?findEntity(sc.pov):null;
+      const who=[...new Set([...(pov?[pov.name]:[]),...det.characters.map(c=>c.name)])];
+      const places=det.places.map(pl=>pl.name);
+      const statusLbl={done:"✓ Fertig",draft:"✎ Entwurf"}[sc.status]||"· Idee";
+      html+=`<div class="tl-node ${sc.status||'todo'}">
+        <div class="tl-card" data-sc="${ch.id}:${sc.id}">
+          ${sc.when?`<span class="tl-when">${esc(sc.when)}</span><br>`:""}
+          <span class="tl-title">${esc(sc.title||"Ohne Titel")}</span>
+          <span class="pill" style="margin-left:8px;font-size:11px">${statusLbl}</span>
+          ${sc.summary?`<div class="tl-sum">${esc(sc.summary)}</div>`:""}
+          <div class="tl-meta">
+            ${who.length?`👤 ${who.map(esc).join(", ")}`:""}
+            ${who.length&&places.length?" · ":""}
+            ${places.length?`🗺️ ${places.map(esc).join(", ")}`:""}
+            ${!who.length&&!places.length?`<span class="muted">${wordCount(sc.text)} Wörter</span>`:` · ${wordCount(sc.text)} W.`}
+          </div>
+        </div></div>`;
+    });
+  });
+  html+="</div>";
+  m.innerHTML+=html;
+  m.querySelectorAll("[data-go]").forEach(e=>e.onclick=()=>go(e.dataset.go));
+  m.querySelectorAll("[data-sc]").forEach(e=>e.onclick=()=>{ const[c,s]=e.dataset.sc.split(":"); openScene(c,s); });
+};
+
+/* ---------- Manuskript-Export (lesbares Dokument) ---------- */
+function buildManuscript(opts){
+  const p=proj();
+  const paras=(t)=>(t||"").split(/\n{2,}/).map(x=>x.trim()).filter(Boolean);
+  if(opts.format==="text"){
+    let out=p.meta.title.toUpperCase()+"\n";
+    if(p.meta.logline) out+="\n"+p.meta.logline+"\n";
+    out+="\n\n";
+    p.chapters.forEach(ch=>{
+      if(!ch.scenes.length) return;
+      out+="\n\n"+(ch.title||"Kapitel").toUpperCase()+"\n\n";
+      ch.scenes.forEach((sc,i)=>{
+        if(opts.titles && sc.title){ out+=(sc.title)+"\n\n"; }
+        else if(i>0){ out+="* * *\n\n"; }
+        out+=(sc.text||"").trim()+"\n\n";
+      });
+    });
+    return out.trim()+"\n";
+  }
+  // HTML zum Ansehen/Drucken
+  const chapters=p.chapters.filter(ch=>ch.scenes.length).map(ch=>{
+    const scenes=ch.scenes.map((sc,i)=>{
+      const body=paras(sc.text).map(x=>`<p>${esc(x)}</p>`).join("")||`<p class="empty-scene">(noch nichts geschrieben)</p>`;
+      const head=opts.titles&&sc.title?`<h3>${esc(sc.title)}</h3>`:(i>0?`<p class="sep">* * *</p>`:"");
+      return head+body;
+    }).join("");
+    return `<section class="chapter"><h2>${esc(ch.title||"Kapitel")}</h2>${scenes}</section>`;
+  }).join("");
+  return `<!DOCTYPE html><html lang="de"><head><meta charset="UTF-8">
+    <title>${esc(p.meta.title)}</title><style>
+    @page{margin:2.5cm}
+    body{font-family:Georgia,"Times New Roman",serif;max-width:720px;margin:40px auto;padding:0 24px;
+      color:#222;line-height:1.7;font-size:18px}
+    .title-page{text-align:center;margin:12vh 0 20vh}
+    .title-page h1{font-size:34px;margin:0 0 12px}
+    .title-page .log{font-style:italic;color:#555;font-size:18px;max-width:460px;margin:0 auto}
+    h2{font-size:24px;margin:0 0 24px;text-align:center;page-break-before:always}
+    h3{font-size:19px;text-align:center;font-weight:normal;font-style:italic;color:#555;margin:28px 0 12px}
+    p{margin:0;text-indent:1.6em}
+    section.chapter > p:first-of-type,p.sep + p{text-indent:0}
+    p.sep{text-align:center;text-indent:0;margin:22px 0;color:#999;letter-spacing:4px}
+    p.empty-scene{color:#aaa;font-style:italic;text-indent:0}
+    .toolbar{position:fixed;top:0;left:0;right:0;background:#f3ede1;border-bottom:1px solid #ddd;
+      padding:10px;text-align:center;font-family:-apple-system,Segoe UI,sans-serif;font-size:14px}
+    .toolbar button{padding:7px 16px;margin:0 4px;border:1px solid #b98;border-radius:7px;background:#fff;cursor:pointer;font-size:14px}
+    .toolbar button.primary{background:#9a6a3c;color:#fff;border-color:#9a6a3c}
+    @media print{.toolbar{display:none}body{margin-top:0}}
+    </style></head><body>
+    <div class="toolbar">📖 Vorschau deines Manuskripts &nbsp;
+      <button class="primary" onclick="window.print()">Drucken / als PDF speichern</button>
+      <button onclick="window.close()">Schließen</button></div>
+    <div style="height:52px"></div>
+    <div class="title-page"><h1>${esc(p.meta.title)}</h1>
+      ${p.meta.logline?`<p class="log">${esc(p.meta.logline)}</p>`:""}</div>
+    ${chapters||"<p>Noch keine Szenen vorhanden.</p>"}
+    </body></html>`;
+}
+function openExport(){
+  const p=proj();
+  modal(`<h3>Manuskript exportieren</h3>
+    <p class="muted" style="margin-top:2px">Verwandelt deine Szenen in ein durchgehendes, lesbares Dokument – gut zum Korrekturlesen oder Weitergeben.</p>
+    <label class="f"><span class="lbl">Szenen trennen durch</span>
+      <select class="in" id="exTitles">
+        <option value="1">Szenentitel als Überschrift</option>
+        <option value="0">Sternchen * * * (Titel weglassen)</option>
+      </select></label>
+    <div class="row wrap" style="margin-top:18px">
+      <button class="btn primary" id="exPreview">📖 Vorschau &amp; Drucken/PDF</button>
+      <button class="btn" id="exHtml">Als HTML-Datei</button>
+      <button class="btn" id="exText">Als Textdatei (.txt)</button>
+    </div>`,
+    null, (root)=>{
+      root.querySelector(".foot").innerHTML=`<button class="btn ghost" onclick="closeModal()">Schließen</button>`;
+      const titles=()=>root.querySelector("#exTitles").value==="1";
+      root.querySelector("#exPreview").onclick=()=>{
+        const w=window.open("","_blank");
+        if(!w){ toast("Bitte Pop-ups für diese Seite erlauben."); return; }
+        w.document.write(buildManuscript({format:"html",titles:titles()})); w.document.close();
+      };
+      root.querySelector("#exHtml").onclick=()=>{
+        download(buildManuscript({format:"html",titles:titles()}), slug(p.meta.title)+".html", "text/html");
+      };
+      root.querySelector("#exText").onclick=()=>{
+        download(buildManuscript({format:"text",titles:titles()}), slug(p.meta.title)+".txt", "text/plain");
+      };
+    }, true);
+}
+function slug(s){ return (s||"manuskript").toLowerCase().replace(/[^a-z0-9äöü]+/gi,"-").replace(/^-|-$/g,"")||"manuskript"; }
+function download(content, filename, type){
+  const blob=new Blob([content],{type:type+";charset=utf-8"});
+  const a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download=filename; a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href),1000); toast("Heruntergeladen: "+filename);
 }
 
 /* ---------- Notizen ---------- */
