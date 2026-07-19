@@ -26,8 +26,23 @@ Internet geschickt** – alles läuft nur bei dir.
   oder eines Ortes, erkennt Federwerk das automatisch. Auf jeder Karteikarte siehst
   du dann, in welchen Szenen die Figur/der Ort vorkommt. (Tipp: Spitznamen im Feld
   „Weitere Namen" eintragen, dann werden auch die erkannt.)
-- **Beziehungen** – Verbinde Figuren/Orte miteinander („Schwester von", „reist
-  nach", „Feind von") und sieh das Geflecht als Diagramm.
+- **Beziehungen** – Verbinde Figuren/Orte miteinander und sieh das Geflecht als
+  Diagramm. Ausgebaut mit:
+  - **Kategorien mit Farben** (Familie, Liebe, Freundschaft, Konflikt, Bündnis,
+    Ort, Sonstiges) – farbige Linien mit Pfeilrichtung und Legende.
+  - **Gegen-Bezeichnung**: „Mutter von" erscheint auf der anderen Karte als
+    „Kind von".
+  - **Interaktiv**: Klick auf eine Figur im Diagramm hebt ihr Geflecht hervor,
+    ein zweiter Klick öffnet ihre Karteikarte.
+  - **Automatische Vorschläge**: Figuren, die oft zusammen in Szenen auftauchen,
+    aber noch nicht verbunden sind, werden vorgeschlagen.
+- **Volltextsuche** – Das Suchfeld links durchsucht Szenen, Figuren, Orte,
+  Elemente, Ideen und Notizen; ein Klick springt zum Treffer.
+- **Tagesziel** – Optionales Wort-Tagesziel mit Fortschrittsring auf der
+  Übersicht (z. B. 300 Wörter/Tag).
+- **Handlungsstränge** – Benannte, farbige Erzähllinien (z. B. „Haupthandlung",
+  „Liebesgeschichte"). Szenen lassen sich einem Strang zuordnen; im Zeitstrahl
+  kannst du nach Strang filtern, im Manuskript zeigt ein farbiger Balken den Strang.
 - **Ideen & Struktur** – Ein Ideenspeicher plus Leitfragen, die dir helfen, aus
   einem Einfall eine Geschichte zu machen, und eine einfache Struktur in 7 Schritten.
 - **Notizen** – ein freier Zettelkasten.

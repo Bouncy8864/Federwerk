@@ -176,8 +176,23 @@
      radial-gradient(circle at 50% 40%, var(--panel), var(--panel))}
   .node circle{fill:var(--accent-bg);stroke:var(--accent-soft);stroke-width:1.5;cursor:pointer}
   .node text{font-family:var(--sans);font-size:12px;fill:var(--ink);pointer-events:none}
-  .edge{stroke:var(--accent-soft);stroke-width:1.5;opacity:.6}
+  .edge{stroke:var(--accent-soft);stroke-width:2;opacity:.65;transition:opacity .15s}
   .edge-label{font-size:10px;fill:var(--ink-soft)}
+  .arrow{transition:opacity .15s}
+  .node circle{transition:opacity .15s,stroke-width .12s}
+  .node text{transition:opacity .15s}
+  .graph.focused .edge,.graph.focused .arrow,.graph.focused .edge-label,
+  .graph.focused .node{opacity:.15}
+  .graph.focused .edge.hi,.graph.focused .arrow.hi,.graph.focused .edge-label.hi,
+  .graph.focused .node.hi{opacity:1}
+  .graph.focused .node.hi circle{stroke-width:3}
+  .legend{display:flex;flex-wrap:wrap;gap:8px;padding:12px 14px;border-top:1px solid var(--line)}
+  .legend .li{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--ink-soft)}
+  .legend .sw{width:14px;height:4px;border-radius:2px;display:inline-block}
+  .rel-cat{width:10px;height:10px;border-radius:50%;display:inline-block;flex-shrink:0}
+  .suggest{background:var(--accent-bg);border:1px solid var(--accent-soft);border-radius:10px;
+       padding:10px 14px;margin-bottom:8px;display:flex;align-items:center;gap:10px}
+  .suggest .txt{flex:1;font-size:14px}
 
   /* Timeline */
   .tl{position:relative;margin-left:6px;padding-left:26px}
@@ -197,6 +212,32 @@
   .tl-title{font-family:var(--serif);font-size:17px;font-weight:600}
   .tl-sum{color:var(--ink-soft);font-size:14px;margin-top:3px}
   .tl-meta{margin-top:7px;font-size:12px;color:var(--ink-soft)}
+
+  /* Threads / Handlungsstränge */
+  .thread-bar{width:4px;align-self:stretch;border-radius:3px;flex-shrink:0;margin-right:2px}
+  .thread-chip{display:inline-flex;align-items:center;gap:6px;padding:3px 10px;border-radius:20px;
+       font-size:12px;border:1px solid var(--line);background:var(--panel);cursor:pointer;color:var(--ink-soft)}
+  .thread-chip.active{border-color:var(--accent-soft);color:var(--ink);font-weight:500}
+  .thread-chip .d{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+  .tl-card{border-left-width:4px;border-left-style:solid}
+
+  /* Search */
+  .search-box{padding:8px 12px;border-bottom:1px solid var(--line)}
+  .search-box input{width:100%;padding:7px 10px;border:1px solid var(--line);border-radius:8px;
+       background:var(--panel-2)}
+  .result{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px 14px;
+       margin-bottom:8px;box-shadow:var(--shadow);cursor:pointer}
+  .result:hover{border-color:var(--accent-soft)}
+  .result .rk{font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:var(--accent)}
+  .result mark{background:var(--accent-bg);color:var(--accent);padding:0 2px;border-radius:3px}
+
+  /* Ring (Schreibziel) */
+  .ring-wrap{display:flex;align-items:center;gap:14px}
+  .ring{--p:0;width:74px;height:74px;border-radius:50%;flex-shrink:0;
+     background:conic-gradient(var(--accent) calc(var(--p)*1%), var(--panel-2) 0);
+     display:flex;align-items:center;justify-content:center}
+  .ring i{width:56px;height:56px;border-radius:50%;background:var(--panel);display:flex;
+     align-items:center;justify-content:center;font-family:var(--serif);font-weight:600;font-size:17px;font-style:normal}
 
   /* Dashboard stats */
   .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:12px;margin-bottom:24px}
@@ -280,8 +321,10 @@ function newProject(title){
   const pid = uid();
   return {
     id: pid,
-    meta:{ title: title||"Neues Projekt", genre:"", logline:"", premise:"", created:Date.now() },
+    meta:{ title: title||"Neues Projekt", genre:"", logline:"", premise:"", created:Date.now(), dailyGoal:0 },
     chapters:[],
+    threads:[],
+    stats:{daily:{}},
     characters:[],
     places:[],
     elements:[],
@@ -334,6 +377,31 @@ function entityKind(id){
   if(p.elements.some(x=>x.id===id))return"element";
   return null;
 }
+
+/* ---------- Beziehungs-Kategorien ---------- */
+const REL_CATEGORIES = [
+  {id:"family",   label:"Familie",            color:"#8a6c47"},
+  {id:"love",     label:"Liebe / Romanze",    color:"#c0566b"},
+  {id:"friend",   label:"Freundschaft",       color:"#5c7a4a"},
+  {id:"conflict", label:"Konflikt / Feind",   color:"#a4443a"},
+  {id:"ally",     label:"Bündnis / Beruf",    color:"#3f6f8f"},
+  {id:"place",    label:"Ort / Zugehörigkeit",color:"#b58a3c"},
+  {id:"other",    label:"Sonstiges",          color:"#8b8378"},
+];
+function catOf(id){ return REL_CATEGORIES.find(c=>c.id===id)||REL_CATEGORIES[6]; }
+
+/* ---------- Handlungsstränge (Farb-Etiketten) ---------- */
+const THREAD_COLORS = ["#c0566b","#3f6f8f","#5c7a4a","#b58a3c","#7a5c9e","#c77d3c","#4aa0a0","#a4443a"];
+function threads(){ const p=proj(); if(!p.threads) p.threads=[]; return p.threads; }
+function threadById(id){ return threads().find(t=>t.id===id)||null; }
+
+/* ---------- Tages-Schreibziel ---------- */
+function todayKey(){ const d=new Date();
+  return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); }
+function ensureDaily(){ const p=proj(); if(!p.stats) p.stats={daily:{}};
+  const k=todayKey(); if(p.stats.daily[k]===undefined){ p.stats.daily[k]=projWordCount(); save(); } }
+function wordsToday(){ const p=proj(); if(!p.stats) return 0;
+  const s=p.stats.daily[todayKey()]; return s===undefined?0:Math.max(0, projWordCount()-s); }
 
 /* ---------- Automatische Erkennung von Namen im Text ---------- */
 function namesFor(entity){
@@ -397,12 +465,63 @@ function renderNav(){
   sel.onchange = ()=>{ DB.current=sel.value; save(); go("dashboard"); };
 }
 function go(view){ VIEW=view; render(); }
-function render(){ renderNav(); document.getElementById("main").innerHTML=""; VIEWS[VIEW](); }
+function render(){ ensureDaily(); renderNav(); renderSearchBox(); document.getElementById("main").innerHTML=""; (VIEWS[VIEW]||VIEWS.dashboard)(); }
+
+/* ---------- Globale Suche ---------- */
+let SEARCH_Q = "";
+function renderSearchBox(){
+  let box=document.getElementById("searchBox");
+  if(!box){
+    box=document.createElement("div"); box.className="search-box"; box.id="searchBox";
+    box.innerHTML=`<input id="searchInput" type="search" placeholder="🔍 Alles durchsuchen…">`;
+    const pick=document.querySelector(".proj-pick"); pick.after(box);
+    box.querySelector("#searchInput").addEventListener("input", debounce(e=>{
+      SEARCH_Q=e.target.value; if(SEARCH_Q.trim()){ if(VIEW!=="search") VIEW="search"; renderSearchResults(); }
+      else if(VIEW==="search"){ VIEW="dashboard"; render(); }
+    },250));
+    box.querySelector("#searchInput").addEventListener("keydown",e=>{ if(e.key==="Enter" && SEARCH_Q.trim()){ VIEW="search"; render(); } });
+  }
+}
+function searchAll(q){
+  const p=proj(); const needle=q.toLowerCase().trim(); const res=[];
+  const push=(kind,title,snippet,action)=>res.push({kind,title,snippet,action});
+  const hit=(t)=>(t||"").toLowerCase().includes(needle);
+  p.chapters.forEach(ch=>ch.scenes.forEach(sc=>{
+    if(hit(sc.title)||hit(sc.text)||hit(sc.summary))
+      push("Szene", sc.title||"Ohne Titel", snippet(sc.text||sc.summary, needle),
+           ()=>openScene(ch.id,sc.id));
+  }));
+  const scanEnt=(arr,kind)=>arr.forEach(e=>{
+    const blob=[e.name,e.aliases,e.role,e.type,e.category,e.goal,e.conflict,e.arc,e.backstory,e.description,e.notes].join(" ");
+    if(hit(blob)) push(kind, e.name, snippet(blob, needle), ()=>openEntity(e.id));
+  });
+  scanEnt(p.characters,"Figur"); scanEnt(p.places,"Ort"); scanEnt(p.elements,"Weltelement");
+  p.ideas.forEach(i=>{ if(hit(i.text)) push("Idee", i.text.slice(0,60), snippet(i.text,needle), ()=>go("ideas")); });
+  if(hit(p.notes)) push("Notiz","Notizen", snippet(p.notes,needle), ()=>go("notes"));
+  return res;
+}
+function snippet(text, needle){
+  const t=(text||"").replace(/\s+/g," "); const i=t.toLowerCase().indexOf(needle);
+  if(i<0) return esc(t.slice(0,90));
+  const start=Math.max(0,i-35), end=Math.min(t.length,i+needle.length+55);
+  return (start>0?"…":"")+esc(t.slice(start,i))+"<mark>"+esc(t.slice(i,i+needle.length))+"</mark>"+esc(t.slice(i+needle.length,end))+(end<t.length?"…":"");
+}
+function renderSearchResults(){
+  const m=document.getElementById("main"); m.innerHTML='<div class="view"></div>'; const v=m.querySelector(".view");
+  const res=searchAll(SEARCH_Q);
+  v.innerHTML=`<h2>Suche</h2><p class="lead">${res.length} Treffer für „${esc(SEARCH_Q)}".</p>`+
+    (res.length? res.map((r,i)=>`<div class="result" data-i="${i}">
+      <div class="rk">${r.kind}</div><div style="font-family:var(--serif);font-size:17px">${esc(r.title)}</div>
+      <div class="muted" style="margin-top:3px">${r.snippet}</div></div>`).join("")
+      : '<div class="empty"><div class="big">🔍</div><p>Nichts gefunden.</p></div>');
+  v.querySelectorAll(".result").forEach(el=>el.onclick=()=>res[+el.dataset.i].action());
+}
 
 /* ============================================================
    Ansichten
    ============================================================ */
 const VIEWS = {};
+VIEWS.search = renderSearchResults;
 
 /* ---------- Dashboard ---------- */
 VIEWS.dashboard = ()=>{
@@ -428,6 +547,10 @@ VIEWS.dashboard = ()=>{
     </div>
 
     <div class="grid cols">
+      <div class="card">
+        <h3>Tagesziel</h3>
+        ${dailyGoalHtml(p)}
+      </div>
       <div class="card">
         <h3>Worum geht es?</h3>
         <p>${p.meta.premise? esc(p.meta.premise).replace(/\n/g,"<br>") :
@@ -457,7 +580,32 @@ VIEWS.dashboard = ()=>{
   m.querySelectorAll("[data-scene]").forEach(e=>e.onclick=()=>{
     const [c,s]=e.dataset.scene.split(":"); openScene(c,s);
   });
+  const gb=m.querySelector("#setGoal"); if(gb) gb.onclick=openGoal;
 };
+function dailyGoalHtml(p){
+  const goal=p.meta.dailyGoal||0; const today=wordsToday();
+  if(!goal){
+    return `<p>Setz dir ein kleines tägliches Wortziel – das hält dich dran, ganz ohne Druck.</p>
+      <p class="muted" style="margin-top:6px">Heute geschrieben: <strong>${today}</strong> Wörter.</p>
+      <button class="btn small" id="setGoal" style="margin-top:10px">Tagesziel festlegen</button>`;
+  }
+  const pct=Math.min(100, Math.round(today/goal*100));
+  const done=today>=goal;
+  return `<div class="ring-wrap">
+      <div class="ring" style="--p:${pct}"><i>${pct}%</i></div>
+      <div><div style="font-size:22px;font-family:var(--serif)">${today} / ${goal}</div>
+        <div class="muted">Wörter heute${done?' &nbsp;🎉 Ziel erreicht!':''}</div>
+        <button class="btn ghost small" id="setGoal" style="margin-top:6px;padding-left:0">Ziel ändern</button></div>
+    </div>`;
+}
+function openGoal(){
+  const p=proj();
+  modal(`<h3>Tägliches Schreibziel</h3>
+    <p class="muted" style="margin-top:2px">Wie viele Wörter möchtest du pro Tag schreiben? Für Einsteiger sind 200–500 ein guter Anfang. 0 = ausschalten.</p>
+    <label class="f"><span class="lbl">Wörter pro Tag</span>
+      <input class="in" id="goalIn" type="number" min="0" step="50" value="${p.meta.dailyGoal||0}"></label>`,
+    ()=>{ p.meta.dailyGoal=Math.max(0, parseInt(val("goalIn"))||0); save(); render(); });
+}
 function recentScenes(){
   const out=[];
   proj().chapters.forEach(c=>c.scenes.forEach(s=>out.push({chapter:c,scene:s})));
@@ -513,13 +661,14 @@ function renderBinder(){
           <span class="ttl" data-editch="${ch.id}">${esc(ch.title||"Kapitel")}</span>
           <button class="btn ghost small" data-addsc="${ch.id}" title="Szene hinzufügen">＋</button>
         </div>
-        ${ch.scenes.map(sc=>`
+        ${ch.scenes.map(sc=>{ const th=sc.thread?threadById(sc.thread):null; return `
           <div class="scene-item ${EDIT_SCENE&&EDIT_SCENE.sceneId===sc.id?'active':''}"
-               draggable="true" data-open="${ch.id}:${sc.id}" data-scid="${sc.id}" data-scch="${ch.id}">
+               draggable="true" data-open="${ch.id}:${sc.id}" data-scid="${sc.id}" data-scch="${ch.id}"
+               ${th?`style="border-left:3px solid ${th.color};padding-left:19px"`:""} title="${th?esc(th.name):""}">
             <span class="grip" title="Szene ziehen zum Umsortieren">⠿</span>
             <span class="dot ${sc.status||'todo'}"></span>
             <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(sc.title||"Ohne Titel")}</span>
-          </div>`).join("")}
+          </div>`;}).join("")}
       </div>`).join("") +
     `<div style="padding:10px 8px"><button class="btn small" id="addChapter">＋ Kapitel</button></div>`;
   b.querySelector("#addChapter").onclick=addChapter;
@@ -630,7 +779,12 @@ function renderEditor(){
       </select>
       <select class="status-sel" id="scPov"><option value="">POV wählen…</option>${povChars}</select>
       <input class="status-sel" id="scWhen" value="${esc(sc.when||"")}" placeholder="Wann? (Handlungszeit)"
-             style="width:150px" title="z. B. Tag 1, Frühling, Rückblende – erscheint im Zeitstrahl">
+             style="width:140px" title="z. B. Tag 1, Frühling, Rückblende – erscheint im Zeitstrahl">
+      <select class="status-sel" id="scThread" title="Handlungsstrang">
+        <option value="">Strang…</option>
+        ${threads().map(t=>`<option value="${t.id}" ${sc.thread===t.id?"selected":""}>${esc(t.name)}</option>`).join("")}
+        <option value="__new">＋ neuer Strang…</option>
+      </select>
       <button class="btn ghost small" id="delScene" title="Szene löschen">🗑</button>
     </div>
     <div class="editor-body">
@@ -650,6 +804,10 @@ function renderEditor(){
   w.querySelector("#scStatus").onchange=e=>{ sc.status=e.target.value; save(); renderBinder(); };
   w.querySelector("#scPov").onchange=e=>{ sc.pov=e.target.value; save(); };
   w.querySelector("#scWhen").oninput=debounce(e=>{ sc.when=e.target.value; save(); },400);
+  w.querySelector("#scThread").onchange=e=>{
+    if(e.target.value==="__new"){ newThread(id=>{ sc.thread=id; save(); renderEditor(); renderBinder(); }); return; }
+    sc.thread=e.target.value; save(); renderBinder();
+  };
   w.querySelector("#delScene").onclick=()=>{
     if(confirm("Diese Szene löschen?")){ ch.scenes=ch.scenes.filter(s=>s.id!==sc.id); EDIT_SCENE=null; save(); VIEWS.manuscript(); }
   };
@@ -811,7 +969,7 @@ function openEntity(id){
       <div>
         <div class="lbl" style="font-size:12px;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.5px">Beziehungen</div>
         <div class="link-list" style="margin-top:6px">
-          ${rels.length? rels.map(r=>`<div>• <span class="muted">${esc(r.label||r.type||"verbunden mit")}</span> <span class="lk" data-ent="${r.otherId}">${esc(r.otherName)}</span></div>`).join("")
+          ${rels.length? rels.map(r=>`<div><span class="rel-cat" style="background:${catOf(r.category).color};margin-right:5px"></span><span class="muted">${esc(r.label||"verbunden mit")}</span> <span class="lk" data-ent="${r.otherId}">${esc(r.otherName)}</span></div>`).join("")
             : '<span class="muted">Noch keine Beziehungen. <span class="lk" data-relnew="1">anlegen</span></span>'}
         </div>
       </div>
@@ -848,29 +1006,53 @@ function relationsOf(id){
   }
   return out;
 }
+let REL_FOCUS = null; // Fokus-Knoten im Graph
 VIEWS.relations = ()=>{
   const p=proj(); const m=mount();
   const nodes = [...p.characters, ...p.places, ...p.elements];
   m.innerHTML=`<div class="row"><h2>Beziehungen</h2><div class="spacer"></div>
       <button class="btn primary" id="addRel">＋ Beziehung</button></div>
-    <p class="lead">Verbinde Figuren, Orte und Elemente miteinander – wer kennt wen, wer gehört wohin. Das Diagramm zeigt dein Beziehungsgeflecht auf einen Blick.</p>`;
+    <p class="lead">Verbinde Figuren, Orte und Elemente miteinander – wer kennt wen, wer gehört wohin. Klick im Diagramm auf eine Figur, um ihr Geflecht hervorzuheben.</p>`;
   if(nodes.length<2){
     m.innerHTML+=`<div class="empty"><div class="big">🔗</div><p>Lege zuerst mindestens zwei Figuren oder Orte an, um sie zu verbinden.</p></div>`;
     m.querySelector("#addRel").onclick=()=>{ toast("Zuerst Figuren/Orte anlegen."); };
     return;
   }
-  m.innerHTML+=`<div class="graph-wrap" style="margin-bottom:22px"><div id="graph"></div></div>
+  // Automatische Vorschläge
+  const sugg=coappearanceSuggestions();
+  const suggHtml = sugg.length? `<div style="margin-bottom:20px">
+      <h3 style="font-family:var(--serif)">💡 Vorschläge</h3>
+      <p class="muted" style="font-size:13px;margin:2px 0 10px">Diese Figuren treten oft gemeinsam auf, sind aber noch nicht verbunden.</p>
+      ${sugg.map(s=>`<div class="suggest">
+        <span class="txt"><strong>${esc(s.a.name)}</strong> &amp; <strong>${esc(s.b.name)}</strong>
+          <span class="muted">– zusammen in ${s.count} Szenen</span></span>
+        <button class="btn small" data-sugg="${s.a.id}:${s.b.id}">Beziehung anlegen</button>
+        <button class="btn ghost small" data-ignore="${s.a.id}:${s.b.id}" title="Vorschlag ausblenden">✕</button>
+      </div>`).join("")}</div>`:"";
+
+  m.innerHTML+=suggHtml+
+    `${REL_FOCUS?`<div class="row" style="margin-bottom:8px"><span class="pill">Fokus: ${esc(findEntity(REL_FOCUS)?.name||"")}</span>
+       <button class="btn ghost small" id="clearFocus">Fokus aufheben</button></div>`:""}
+    <div class="graph-wrap" style="margin-bottom:22px"><div id="graph"></div><div id="legend"></div></div>
     <h3 style="font-family:var(--serif)">Alle Verbindungen</h3>
     <div id="relList"></div>`;
   m.querySelector("#addRel").onclick=()=>openRelForm(null);
+  const cf=m.querySelector("#clearFocus"); if(cf) cf.onclick=()=>{ REL_FOCUS=null; VIEWS.relations(); };
+  m.querySelectorAll("[data-sugg]").forEach(b=>b.onclick=()=>{ const[a,c]=b.dataset.sugg.split(":"); openRelForm(null,a,c); });
+  m.querySelectorAll("[data-ignore]").forEach(b=>b.onclick=()=>{
+    if(!p._ignoredSugg) p._ignoredSugg=[]; p._ignoredSugg.push(b.dataset.ignore); save(); VIEWS.relations();
+  });
   drawGraph(document.getElementById("graph"), nodes);
+  renderLegend(document.getElementById("legend"));
   const rl=m.querySelector("#relList");
   if(p.relationships.length===0){ rl.innerHTML='<p class="muted">Noch keine Beziehungen angelegt.</p>'; }
   else rl.innerHTML=p.relationships.map(r=>{
     const a=findEntity(r.from), b=findEntity(r.to); if(!a||!b) return "";
+    const cat=catOf(r.category);
     return `<div class="rel-item">
+      <span class="rel-cat" style="background:${cat.color}" title="${cat.label}"></span>
       <span class="lk" data-ent="${a.id}" style="color:var(--accent);cursor:pointer">${esc(a.name)}</span>
-      <span class="muted">— ${esc(r.label||r.type||"verbunden mit")} →</span>
+      <span class="muted">— ${esc(r.label||"verbunden mit")} →</span>
       <span class="lk" data-ent="${b.id}" style="color:var(--accent);cursor:pointer">${esc(b.name)}</span>
       <div class="spacer" style="flex:1"></div>
       <button class="btn ghost small" data-edit="${r.id}">bearbeiten</button>
@@ -883,20 +1065,51 @@ VIEWS.relations = ()=>{
     proj().relationships=proj().relationships.filter(r=>r.id!==x.dataset.del); save(); VIEWS.relations();
   });
 };
-function openRelForm(relId, presetFrom){
+// Figurenpaare, die oft zusammen auftreten, aber keine Beziehung haben
+function coappearanceSuggestions(){
+  const p=proj(); const counts={};
+  for(const ch of p.chapters) for(const sc of ch.scenes){
+    const chars=detectInText(sc.text).characters.map(c=>c.id);
+    for(let i=0;i<chars.length;i++) for(let j=i+1;j<chars.length;j++){
+      const key=[chars[i],chars[j]].sort().join(":"); counts[key]=(counts[key]||0)+1;
+    }
+  }
+  const has=(a,b)=>p.relationships.some(r=>(r.from===a&&r.to===b)||(r.from===b&&r.to===a));
+  const ignored=p._ignoredSugg||[];
+  return Object.entries(counts).map(([k,count])=>{ const[a,b]=k.split(":"); return {a,b,count,key:k}; })
+    .filter(s=>s.count>=2 && !has(s.a,s.b) && !ignored.includes(s.key))
+    .map(s=>({a:findEntity(s.a), b:findEntity(s.b), count:s.count}))
+    .filter(s=>s.a&&s.b)
+    .sort((x,y)=>y.count-x.count).slice(0,5);
+}
+function renderLegend(el){
+  const used=new Set(proj().relationships.map(r=>r.category||"other"));
+  if(!used.size){ el.innerHTML=""; return; }
+  el.className="legend";
+  el.innerHTML=REL_CATEGORIES.filter(c=>used.has(c.id)).map(c=>
+    `<span class="li"><span class="sw" style="background:${c.color}"></span>${c.label}</span>`).join("");
+}
+function openRelForm(relId, presetFrom, presetTo){
   const p=proj();
-  const rel = relId? p.relationships.find(r=>r.id===relId) : {id:uid(), from:presetFrom||"", to:"", type:"", label:""};
+  const rel = relId? p.relationships.find(r=>r.id===relId)
+    : {id:uid(), from:presetFrom||"", to:presetTo||"", category:"family", label:"", labelRev:""};
   const opts=(sel)=>[...p.characters,...p.places,...p.elements]
     .map(e=>`<option value="${e.id}" ${sel===e.id?"selected":""}>${esc(e.name)}</option>`).join("");
+  const catOpts=REL_CATEGORIES.map(c=>`<option value="${c.id}" ${rel.category===c.id?"selected":""}>${c.label}</option>`).join("");
   modal(`<h3>${relId?"Beziehung bearbeiten":"Neue Beziehung"}</h3>
     <div class="two">
       <label class="f"><span class="lbl">Von</span><select class="in" id="rFrom"><option value="">wählen…</option>${opts(rel.from)}</select></label>
       <label class="f"><span class="lbl">Zu</span><select class="in" id="rTo"><option value="">wählen…</option>${opts(rel.to)}</select></label>
     </div>
-    <label class="f"><span class="lbl">Art der Beziehung</span><input class="in" id="rLabel" value="${esc(rel.label||"")}" placeholder="z. B. Schwester von, verliebt in, wohnt in, Feind von"></label>
-    <div class="muted" style="font-size:13px;margin-top:8px">Tipp: Beschreibe die Beziehung aus Sicht von „Von → Zu".</div>`,
+    <label class="f"><span class="lbl">Kategorie (bestimmt die Farbe)</span><select class="in" id="rCat">${catOpts}</select></label>
+    <div class="two">
+      <label class="f"><span class="lbl">Bezeichnung (Von → Zu)</span><input class="in" id="rLabel" value="${esc(rel.label||"")}" placeholder="z. B. Mutter von, verliebt in, wohnt in"></label>
+      <label class="f"><span class="lbl">Gegenrichtung (Zu → Von, optional)</span><input class="in" id="rLabelRev" value="${esc(rel.labelRev||"")}" placeholder="z. B. Kind von"></label>
+    </div>
+    <div class="muted" style="font-size:13px;margin-top:8px">Tipp: Die Gegen-Bezeichnung erscheint auf der Karteikarte der anderen Figur.</div>`,
     ()=>{
-      rel.from=val("rFrom"); rel.to=val("rTo"); rel.label=val("rLabel");
+      rel.from=val("rFrom"); rel.to=val("rTo"); rel.category=val("rCat");
+      rel.label=val("rLabel"); rel.labelRev=val("rLabelRev");
       if(!rel.from||!rel.to||rel.from===rel.to){ toast("Bitte zwei verschiedene Einträge wählen."); return false; }
       if(!relId) p.relationships.push(rel);
       save(); VIEWS.relations();
@@ -904,31 +1117,50 @@ function openRelForm(relId, presetFrom){
 }
 function drawGraph(container, nodes){
   const p=proj();
-  const W=container.clientWidth||760, H=Math.max(320, Math.min(520, 120+nodes.length*26));
-  const cx=W/2, cy=H/2, R=Math.min(W,H)/2-60;
+  const W=container.clientWidth||760, H=Math.max(320, Math.min(560, 140+nodes.length*26));
+  const cx=W/2, cy=H/2, R=Math.min(W,H)/2-70;
   const pos={};
   nodes.forEach((n,i)=>{
     const ang=(i/nodes.length)*Math.PI*2 - Math.PI/2;
     pos[n.id]={x:cx+R*Math.cos(ang), y:cy+R*Math.sin(ang), n};
   });
+  const focusSet=new Set();
+  if(REL_FOCUS){ focusSet.add(REL_FOCUS);
+    p.relationships.forEach(r=>{ if(r.from===REL_FOCUS) focusSet.add(r.to); if(r.to===REL_FOCUS) focusSet.add(r.from); }); }
   const edges=p.relationships.map(r=>{
     if(!pos[r.from]||!pos[r.to]) return "";
     const a=pos[r.from], b=pos[r.to];
-    const mx=(a.x+b.x)/2, my=(a.y+b.y)/2;
-    return `<line class="edge" x1="${a.x}" y1="${a.y}" x2="${b.x}" y2="${b.y}"></line>
-      <text class="edge-label" x="${mx}" y="${my-3}" text-anchor="middle">${esc((r.label||"").slice(0,22))}</text>`;
+    const dx=b.x-a.x, dy=b.y-a.y, len=Math.hypot(dx,dy)||1; const ux=dx/len, uy=dy/len;
+    const x1=a.x+ux*24, y1=a.y+uy*24, x2=b.x-ux*26, y2=b.y-uy*26;
+    const mx=(x1+x2)/2, my=(y1+y2)/2;
+    const col=catOf(r.category).color;
+    const hi=REL_FOCUS&&(r.from===REL_FOCUS||r.to===REL_FOCUS)?" hi":"";
+    // Pfeilspitze
+    const ah=8, ang=Math.atan2(uy,ux);
+    const p1x=x2-ah*Math.cos(ang-0.4), p1y=y2-ah*Math.sin(ang-0.4);
+    const p2x=x2-ah*Math.cos(ang+0.4), p2y=y2-ah*Math.sin(ang+0.4);
+    return `<line class="edge${hi}" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${col}"></line>
+      <polygon class="arrow${hi}" points="${x2},${y2} ${p1x},${p1y} ${p2x},${p2y}" fill="${col}"></polygon>
+      <text class="edge-label${hi}" x="${mx}" y="${my-4}" text-anchor="middle">${esc((r.label||"").slice(0,22))}</text>`;
   }).join("");
   const nodeSvg=nodes.map(n=>{
     const pt=pos[n.id]; const isChar=p.characters.some(c=>c.id===n.id);
+    const isElem=p.elements.some(c=>c.id===n.id);
     const lbl=n.name.length>16?n.name.slice(0,15)+"…":n.name;
-    return `<g class="node" data-ent="${n.id}">
+    const hi=REL_FOCUS&&focusSet.has(n.id)?" hi":"";
+    const glyph=isChar?initials(n.name):(isElem?"✦":"◈");
+    return `<g class="node${hi}" data-ent="${n.id}">
       <circle cx="${pt.x}" cy="${pt.y}" r="22"></circle>
-      <text x="${pt.x}" y="${pt.y+4}" text-anchor="middle" font-family="var(--serif)" font-weight="600">${isChar?initials(n.name):(isChar?"":"✦")}</text>
+      <text x="${pt.x}" y="${pt.y+4}" text-anchor="middle" font-family="var(--serif)" font-weight="600">${glyph}</text>
       <text x="${pt.x}" y="${pt.y+38}" text-anchor="middle">${esc(lbl)}</text>
     </g>`;
   }).join("");
-  container.innerHTML=`<svg class="graph" viewBox="0 0 ${W} ${H}" style="height:${H}px">${edges}${nodeSvg}</svg>`;
-  container.querySelectorAll(".node").forEach(g=>g.onclick=()=>openEntity(g.dataset.ent));
+  container.innerHTML=`<svg class="graph ${REL_FOCUS?'focused':''}" viewBox="0 0 ${W} ${H}" style="height:${H}px">${edges}${nodeSvg}</svg>`;
+  container.querySelectorAll(".node").forEach(g=>g.onclick=()=>{
+    const id=g.dataset.ent;
+    if(REL_FOCUS===id) openEntity(id);       // zweiter Klick öffnet die Karteikarte
+    else { REL_FOCUS=id; VIEWS.relations(); } // erster Klick fokussiert
+  });
 }
 
 /* ---------- Ideen & Struktur ---------- */
@@ -1017,30 +1249,83 @@ function renderNextPrompt(m,p){
     if(el.value.trim()){ p.ideas.unshift({id:uid(),text:"["+PROMPTS[idx]+"] "+el.value,done:false}); save(); el.value=""; toast("Gespeichert."); VIEWS.ideas(); } };
 }
 
+/* ---------- Handlungsstränge ---------- */
+function newThread(cb){
+  const list=threads(); const color=THREAD_COLORS[list.length%THREAD_COLORS.length];
+  modal(`<h3>Neuer Handlungsstrang</h3>
+    <p class="muted" style="margin-top:2px">Stränge (z. B. „Haupthandlung", „Liebesgeschichte", „Rückblenden") helfen dir, parallele Erzähllinien farblich auseinanderzuhalten.</p>
+    <label class="f"><span class="lbl">Name</span><input class="in" id="tName" placeholder="z. B. Haupthandlung"></label>
+    <label class="f"><span class="lbl">Farbe</span><div class="row wrap" id="tColors" style="margin-top:4px">
+      ${THREAD_COLORS.map((c,i)=>`<button type="button" class="swatch" data-c="${c}" style="width:28px;height:28px;border-radius:50%;border:2px solid ${i===list.length%THREAD_COLORS.length?'var(--ink)':'transparent'};background:${c}"></button>`).join("")}
+    </div></label>`,
+    ()=>{ const t={id:uid(), name:val("tName")||"Strang", color:PICKED_COLOR||color}; list.push(t); save();
+      if(cb) cb(t.id); else VIEWS.timeline(); },
+    (root)=>{ PICKED_COLOR=color;
+      root.querySelectorAll(".swatch").forEach(b=>b.onclick=()=>{ PICKED_COLOR=b.dataset.c;
+        root.querySelectorAll(".swatch").forEach(x=>x.style.borderColor="transparent"); b.style.borderColor="var(--ink)"; });
+    });
+}
+let PICKED_COLOR=null;
+function manageThreads(){
+  const list=threads();
+  modal(`<h3>Handlungsstränge verwalten</h3>
+    ${list.length? '<div id="thList"></div>' : '<p class="muted">Noch keine Stränge. Lege gleich deinen ersten an.</p>'}
+    <button class="btn" id="tAdd" style="margin-top:12px">＋ Neuer Strang</button>`,
+    null,
+    (root)=>{
+      root.querySelector(".foot").innerHTML=`<button class="btn ghost" onclick="closeModal()">Schließen</button>`;
+      const tl=root.querySelector("#thList");
+      if(tl) tl.innerHTML=list.map(t=>`<div class="rel-item">
+        <span class="thread-chip active"><span class="d" style="background:${t.color}"></span>${esc(t.name)}</span>
+        <div class="spacer" style="flex:1"></div>
+        <button class="btn ghost small" data-delt="${t.id}">🗑</button></div>`).join("");
+      root.querySelectorAll("[data-delt]").forEach(b=>b.onclick=()=>{
+        proj().threads=threads().filter(t=>t.id!==b.dataset.delt);
+        proj().chapters.forEach(ch=>ch.scenes.forEach(s=>{ if(s.thread===b.dataset.delt) s.thread=""; }));
+        save(); closeModal(); if(VIEW==="timeline")VIEWS.timeline(); else render();
+      });
+      root.querySelector("#tAdd").onclick=()=>{ closeModal(); newThread(()=>{ manageThreads(); }); };
+    }, true);
+}
+
 /* ---------- Zeitstrahl ---------- */
+let TL_FILTER = ""; // Strang-Filter
 VIEWS.timeline = ()=>{
   const p=proj(); const m=mount();
   const total=p.chapters.reduce((a,c)=>a+c.scenes.length,0);
   m.innerHTML=`<div class="row"><h2>Zeitstrahl</h2><div class="spacer"></div>
+      <button class="btn small" id="manageThreads">Stränge verwalten</button>
       <button class="btn small" data-go="manuscript">Zum Manuskript</button></div>
-    <p class="lead">Der Verlauf deiner Handlung in Leserichtung. So siehst du auf einen Blick, was wann passiert, wer dabei ist und wie weit du bist. Trage in einer Szene das Feld „Wann?" ein, um die Handlungszeit anzuzeigen.</p>`;
+    <p class="lead">Der Verlauf deiner Handlung in Leserichtung. So siehst du auf einen Blick, was wann passiert, wer dabei ist und wie weit du bist. Trage in einer Szene „Wann?" ein oder ordne sie einem farbigen Handlungsstrang zu.</p>`;
   if(total===0){
     m.innerHTML+=`<div class="empty"><div class="big">📅</div><p>Noch keine Szenen. <span class="lk" data-go="manuscript" style="color:var(--accent);cursor:pointer">Schreib deine erste Szene.</span></p></div>`;
+    m.querySelector("#manageThreads").onclick=manageThreads;
     m.querySelectorAll("[data-go]").forEach(e=>e.onclick=()=>go(e.dataset.go)); return;
   }
-  let html='<div class="tl">';
+  // Strang-Filter
+  if(threads().length){
+    m.innerHTML+=`<div class="row wrap" style="margin-bottom:16px" id="tlFilter">
+      <span class="thread-chip ${TL_FILTER===""?"active":""}" data-tf="">Alle Stränge</span>
+      ${threads().map(t=>`<span class="thread-chip ${TL_FILTER===t.id?"active":""}" data-tf="${t.id}">
+        <span class="d" style="background:${t.color}"></span>${esc(t.name)}</span>`).join("")}</div>`;
+  }
+  let html='<div class="tl">'; let shown=0;
   p.chapters.forEach(ch=>{
-    if(!ch.scenes.length) return;
+    const scenes=ch.scenes.filter(sc=>!TL_FILTER||sc.thread===TL_FILTER);
+    if(!scenes.length) return;
     html+=`<div class="tl-chapter">${esc(ch.title||"Kapitel")}</div>`;
-    ch.scenes.forEach(sc=>{
+    scenes.forEach(sc=>{
+      shown++;
       const det=detectInText(sc.text);
       const pov=sc.pov?findEntity(sc.pov):null;
       const who=[...new Set([...(pov?[pov.name]:[]),...det.characters.map(c=>c.name)])];
       const places=det.places.map(pl=>pl.name);
       const statusLbl={done:"✓ Fertig",draft:"✎ Entwurf"}[sc.status]||"· Idee";
+      const th=sc.thread?threadById(sc.thread):null;
       html+=`<div class="tl-node ${sc.status||'todo'}">
-        <div class="tl-card" data-sc="${ch.id}:${sc.id}">
-          ${sc.when?`<span class="tl-when">${esc(sc.when)}</span><br>`:""}
+        <div class="tl-card" data-sc="${ch.id}:${sc.id}" style="border-left-color:${th?th.color:'var(--line)'}">
+          ${sc.when?`<span class="tl-when">${esc(sc.when)}</span> `:""}
+          ${th?`<span class="thread-chip active" style="font-size:11px"><span class="d" style="background:${th.color}"></span>${esc(th.name)}</span><br>`:(sc.when?"<br>":"")}
           <span class="tl-title">${esc(sc.title||"Ohne Titel")}</span>
           <span class="pill" style="margin-left:8px;font-size:11px">${statusLbl}</span>
           ${sc.summary?`<div class="tl-sum">${esc(sc.summary)}</div>`:""}
@@ -1054,7 +1339,9 @@ VIEWS.timeline = ()=>{
     });
   });
   html+="</div>";
-  m.innerHTML+=html;
+  m.innerHTML+= shown? html : '<p class="muted">Keine Szenen in diesem Strang.</p>';
+  m.querySelector("#manageThreads").onclick=manageThreads;
+  m.querySelectorAll("[data-tf]").forEach(e=>e.onclick=()=>{ TL_FILTER=e.dataset.tf; VIEWS.timeline(); });
   m.querySelectorAll("[data-go]").forEach(e=>e.onclick=()=>go(e.dataset.go));
   m.querySelectorAll("[data-sc]").forEach(e=>e.onclick=()=>{ const[c,s]=e.dataset.sc.split(":"); openScene(c,s); });
 };
