@@ -1,0 +1,982 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Federwerk – Autoren-Werkzeug</title>
+<style>
+  :root{
+    --bg:#f6f3ec;
+    --panel:#fffdf9;
+    --panel-2:#f0ebe0;
+    --ink:#2b2620;
+    --ink-soft:#6b6155;
+    --line:#e2d9c9;
+    --accent:#9a6a3c;
+    --accent-soft:#c9a878;
+    --accent-bg:#f3e7d6;
+    --danger:#a4443a;
+    --ok:#5c7a4a;
+    --shadow:0 1px 3px rgba(60,45,25,.08),0 6px 20px rgba(60,45,25,.06);
+    --radius:10px;
+    --serif:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;
+    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  }
+  html[data-theme="dark"]{
+    --bg:#20201d; --panel:#2a2926; --panel-2:#333230;
+    --ink:#eae5da; --ink-soft:#a49c8e; --line:#403e39;
+    --accent:#d3a76d; --accent-soft:#8a6c47; --accent-bg:#3a332a;
+    --shadow:0 1px 3px rgba(0,0,0,.3),0 6px 20px rgba(0,0,0,.25);
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:var(--sans);background:var(--bg);color:var(--ink);
+       height:100vh;overflow:hidden;font-size:15px;line-height:1.5}
+  button{font-family:inherit;font-size:inherit;cursor:pointer}
+  input,textarea,select{font-family:inherit;font-size:inherit;color:var(--ink)}
+
+  /* Layout */
+  .app{display:grid;grid-template-columns:230px 1fr;height:100vh}
+  .sidebar{background:var(--panel);border-right:1px solid var(--line);display:flex;
+           flex-direction:column;overflow:hidden}
+  .brand{padding:16px 18px 12px;border-bottom:1px solid var(--line)}
+  .brand h1{margin:0;font-family:var(--serif);font-size:21px;letter-spacing:.3px}
+  .brand .sub{color:var(--ink-soft);font-size:12px;margin-top:2px}
+  .proj-pick{padding:10px 12px;border-bottom:1px solid var(--line)}
+  .proj-pick select{width:100%;padding:7px 8px;border:1px solid var(--line);border-radius:8px;
+                    background:var(--panel-2)}
+  .nav{flex:1;overflow-y:auto;padding:8px}
+  .nav button{display:flex;align-items:center;gap:10px;width:100%;text-align:left;
+              padding:9px 12px;margin:2px 0;border:0;border-radius:8px;background:transparent;
+              color:var(--ink);font-weight:500}
+  .nav button:hover{background:var(--panel-2)}
+  .nav button.active{background:var(--accent-bg);color:var(--accent)}
+  .nav .ico{width:18px;text-align:center;font-size:16px}
+  .nav .count{margin-left:auto;font-size:12px;color:var(--ink-soft);background:var(--panel-2);
+              padding:1px 7px;border-radius:20px}
+  .nav button.active .count{background:var(--panel)}
+  .side-foot{padding:10px;border-top:1px solid var(--line);display:flex;gap:6px;flex-wrap:wrap}
+  .side-foot button{flex:1;padding:7px;border:1px solid var(--line);border-radius:8px;
+                    background:var(--panel-2);color:var(--ink-soft);font-size:12px}
+  .side-foot button:hover{color:var(--accent);border-color:var(--accent-soft)}
+
+  .main{overflow-y:auto;position:relative}
+  .view{padding:26px 34px;max-width:1100px;margin:0 auto}
+  .view h2{font-family:var(--serif);font-size:26px;margin:0 0 4px}
+  .view .lead{color:var(--ink-soft);margin:0 0 22px;max-width:640px}
+
+  /* Buttons */
+  .btn{padding:8px 14px;border:1px solid var(--line);border-radius:8px;background:var(--panel);
+       color:var(--ink);font-weight:500}
+  .btn:hover{border-color:var(--accent-soft)}
+  .btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+  .btn.primary:hover{filter:brightness(1.06)}
+  .btn.small{padding:5px 10px;font-size:13px}
+  .btn.ghost{background:transparent;border-color:transparent;color:var(--ink-soft)}
+  .btn.ghost:hover{background:var(--panel-2);color:var(--ink)}
+  .btn.danger{color:var(--danger);border-color:transparent}
+  .btn.danger:hover{background:rgba(164,68,58,.1)}
+  .row{display:flex;gap:10px;align-items:center}
+  .row.wrap{flex-wrap:wrap}
+  .spacer{flex:1}
+
+  /* Cards */
+  .grid{display:grid;gap:14px}
+  .grid.cols{grid-template-columns:repeat(auto-fill,minmax(240px,1fr))}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);
+        padding:16px;box-shadow:var(--shadow)}
+  .card h3{margin:0 0 6px;font-family:var(--serif);font-size:18px}
+  .card .meta{font-size:12px;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.5px}
+  .card p{margin:8px 0 0;color:var(--ink-soft);font-size:14px}
+  .entity-card{cursor:pointer;transition:border-color .12s,transform .12s}
+  .entity-card:hover{border-color:var(--accent-soft);transform:translateY(-1px)}
+  .avatar{width:44px;height:44px;border-radius:50%;background:var(--accent-bg);color:var(--accent);
+          display:flex;align-items:center;justify-content:center;font-family:var(--serif);
+          font-size:20px;font-weight:600;flex-shrink:0}
+  .avatar.sq{border-radius:10px}
+  .tag{display:inline-block;padding:2px 9px;border-radius:20px;background:var(--panel-2);
+       font-size:12px;color:var(--ink-soft);margin:2px 4px 2px 0}
+  .tag.role{background:var(--accent-bg);color:var(--accent)}
+
+  /* Fields */
+  label.f{display:block;margin:12px 0 0}
+  label.f .lbl{display:block;font-size:12px;color:var(--ink-soft);margin-bottom:4px;
+               text-transform:uppercase;letter-spacing:.5px}
+  .in,textarea.in,select.in{width:100%;padding:9px 11px;border:1px solid var(--line);
+       border-radius:8px;background:var(--panel);color:var(--ink)}
+  textarea.in{resize:vertical;min-height:70px;line-height:1.55}
+  .in:focus,textarea.in:focus,select.in:focus{outline:none;border-color:var(--accent-soft);
+       box-shadow:0 0 0 3px var(--accent-bg)}
+  .two{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  .three{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px}
+
+  /* Empty */
+  .empty{text-align:center;padding:60px 20px;color:var(--ink-soft)}
+  .empty .big{font-size:44px;margin-bottom:10px;opacity:.6}
+
+  /* Modal */
+  .overlay{position:fixed;inset:0;background:rgba(30,24,14,.45);display:flex;
+           align-items:flex-start;justify-content:center;padding:40px 16px;z-index:50;
+           overflow-y:auto}
+  .modal{background:var(--panel);border-radius:14px;box-shadow:var(--shadow);width:100%;
+         max-width:640px;padding:24px 26px;border:1px solid var(--line)}
+  .modal.wide{max-width:860px}
+  .modal h3{margin:0 0 2px;font-family:var(--serif);font-size:22px}
+  .modal .foot{display:flex;gap:10px;margin-top:20px;justify-content:flex-end}
+
+  /* Manuscript */
+  .ms{display:grid;grid-template-columns:260px 1fr;gap:0;height:calc(100vh);}
+  .binder{border-right:1px solid var(--line);background:var(--panel);overflow-y:auto;padding:14px 10px}
+  .binder h4{font-size:12px;text-transform:uppercase;letter-spacing:.6px;color:var(--ink-soft);
+             margin:6px 8px;display:flex;align-items:center}
+  .chapter{margin-bottom:6px}
+  .chapter-h{display:flex;align-items:center;gap:6px;padding:6px 8px;border-radius:7px;font-weight:600}
+  .chapter-h:hover{background:var(--panel-2)}
+  .chapter-h .ttl{flex:1;cursor:pointer}
+  .scene-item{display:flex;align-items:center;gap:7px;padding:6px 8px 6px 22px;border-radius:7px;
+              cursor:pointer;color:var(--ink-soft);font-size:14px}
+  .scene-item:hover{background:var(--panel-2)}
+  .scene-item.active{background:var(--accent-bg);color:var(--accent);font-weight:500}
+  .scene-item .dot{width:8px;height:8px;border-radius:50%;background:var(--accent-soft);flex-shrink:0}
+  .scene-item .dot.draft{background:#c9a878}
+  .scene-item .dot.done{background:var(--ok)}
+  .scene-item .dot.todo{background:var(--line)}
+  .editor-wrap{overflow-y:auto;display:flex;flex-direction:column}
+  .editor-bar{position:sticky;top:0;background:var(--panel);border-bottom:1px solid var(--line);
+              padding:10px 22px;display:flex;align-items:center;gap:12px;z-index:5;flex-wrap:wrap}
+  .editor-bar input.title{border:0;background:transparent;font-family:var(--serif);font-size:20px;
+                           font-weight:600;flex:1;min-width:140px}
+  .editor-bar input.title:focus{outline:none}
+  .editor-body{padding:20px 22px 80px;max-width:760px;width:100%;margin:0 auto;flex:1}
+  .editor-body textarea{width:100%;border:0;background:transparent;font-family:var(--serif);
+       font-size:18px;line-height:1.75;min-height:55vh;resize:none;color:var(--ink)}
+  .editor-body textarea:focus{outline:none}
+  .scene-summary{width:100%;border:1px dashed var(--line);border-radius:8px;padding:9px 11px;
+       background:var(--panel-2);font-size:13px;margin-bottom:16px;color:var(--ink-soft)}
+  .detected{padding:8px 22px;border-top:1px solid var(--line);background:var(--panel);
+            font-size:13px;color:var(--ink-soft)}
+  .detected .chip{display:inline-flex;align-items:center;gap:5px;background:var(--accent-bg);
+        color:var(--accent);padding:2px 10px;border-radius:20px;margin:2px 4px 2px 0;font-size:12px}
+
+  .pill{padding:4px 10px;border-radius:20px;font-size:12px;border:1px solid var(--line);
+        background:var(--panel);color:var(--ink-soft)}
+  .status-sel{padding:4px 8px;border-radius:7px;border:1px solid var(--line);background:var(--panel-2);
+              font-size:12px}
+
+  /* Relationship graph */
+  .graph-wrap{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);
+              box-shadow:var(--shadow);overflow:hidden}
+  svg.graph{width:100%;display:block;background:
+     radial-gradient(circle at 50% 40%, var(--panel), var(--panel))}
+  .node circle{fill:var(--accent-bg);stroke:var(--accent-soft);stroke-width:1.5;cursor:pointer}
+  .node text{font-family:var(--sans);font-size:12px;fill:var(--ink);pointer-events:none}
+  .edge{stroke:var(--accent-soft);stroke-width:1.5;opacity:.6}
+  .edge-label{font-size:10px;fill:var(--ink-soft)}
+
+  /* Dashboard stats */
+  .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:12px;margin-bottom:24px}
+  .stat{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:16px;
+        box-shadow:var(--shadow)}
+  .stat .n{font-family:var(--serif);font-size:30px;line-height:1}
+  .stat .l{color:var(--ink-soft);font-size:13px;margin-top:4px}
+  .progressbar{height:8px;background:var(--panel-2);border-radius:20px;overflow:hidden;margin-top:8px}
+  .progressbar i{display:block;height:100%;background:var(--accent)}
+
+  /* Ideas */
+  .idea{display:flex;gap:10px;align-items:flex-start;background:var(--panel);border:1px solid var(--line);
+        border-radius:10px;padding:12px 14px;margin-bottom:8px;box-shadow:var(--shadow)}
+  .idea .txt{flex:1}
+  .idea.done .txt{text-decoration:line-through;color:var(--ink-soft)}
+  .prompt-box{background:var(--accent-bg);border:1px solid var(--accent-soft);border-radius:10px;
+              padding:16px 18px;margin-bottom:20px}
+  .prompt-box .q{font-family:var(--serif);font-size:17px;margin-bottom:8px}
+
+  .beat{display:flex;gap:12px;padding:12px 0;border-bottom:1px solid var(--line)}
+  .beat:last-child{border-bottom:0}
+  .beat .num{width:28px;height:28px;border-radius:50%;background:var(--accent-bg);color:var(--accent);
+             display:flex;align-items:center;justify-content:center;font-weight:600;flex-shrink:0}
+  .beat .bt{font-weight:600}
+  .beat .bd{color:var(--ink-soft);font-size:14px}
+
+  .link-list a,.link-list span.lk{color:var(--accent);cursor:pointer;text-decoration:none}
+  .link-list a:hover{text-decoration:underline}
+  .divider{height:1px;background:var(--line);margin:20px 0}
+  .muted{color:var(--ink-soft)}
+  .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--ink);
+         color:var(--bg);padding:10px 18px;border-radius:8px;font-size:14px;z-index:100;
+         opacity:0;transition:opacity .2s;pointer-events:none}
+  .toast.show{opacity:.95}
+  .rel-item{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--line)}
+  .rel-item:last-child{border-bottom:0}
+  @media(max-width:820px){
+    .app{grid-template-columns:1fr}
+    .sidebar{display:none}
+    .ms{grid-template-columns:1fr}
+    .binder{display:none}
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar">
+    <div class="brand">
+      <h1>Federwerk</h1>
+      <div class="sub">Dein Werkzeug für Geschichten &amp; Welten</div>
+    </div>
+    <div class="proj-pick">
+      <select id="projectSelect" class="in"></select>
+    </div>
+    <nav class="nav" id="nav"></nav>
+    <div class="side-foot">
+      <button id="btnNewProject">＋ Projekt</button>
+      <button id="btnExport">Sichern</button>
+      <button id="btnImport">Laden</button>
+      <button id="btnTheme">◐ Thema</button>
+    </div>
+  </aside>
+  <main class="main" id="main"></main>
+</div>
+<div id="modalRoot"></div>
+<div class="toast" id="toast"></div>
+<input type="file" id="fileInput" accept="application/json" style="display:none">
+
+<script>
+"use strict";
+/* ============================================================
+   Federwerk – einfaches Autoren-Werkzeug (eine Datei, offline)
+   Speicherung: localStorage. Kein Server, keine Cloud.
+   ============================================================ */
+
+const STORE_KEY = "federwerk.v1";
+const uid = () => Math.random().toString(36).slice(2,9) + Date.now().toString(36).slice(-3);
+
+/* ---------- Datenmodell ---------- */
+function newProject(title){
+  const pid = uid();
+  return {
+    id: pid,
+    meta:{ title: title||"Neues Projekt", genre:"", logline:"", premise:"", created:Date.now() },
+    chapters:[],
+    characters:[],
+    places:[],
+    elements:[],
+    relationships:[],
+    ideas:[],
+    notes:""
+  };
+}
+
+let DB = load();
+function load(){
+  try{
+    const raw = localStorage.getItem(STORE_KEY);
+    if(raw){ const d = JSON.parse(raw); if(d && d.projects) return d; }
+  }catch(e){}
+  const p = newProject("Meine erste Geschichte");
+  // Ein paar Ideen-Anregungen als Start
+  p.ideas = [
+    {id:uid(), text:"Was ist die eine Frage, die meine Geschichte beantworten will?", done:false},
+    {id:uid(), text:"Wer verändert sich am meisten – und wodurch?", done:false}
+  ];
+  return { projects:{[p.id]:p}, current:p.id };
+}
+function save(){ try{ localStorage.setItem(STORE_KEY, JSON.stringify(DB)); }catch(e){ toast("Speichern fehlgeschlagen (Speicher voll?)"); } }
+function proj(){ return DB.projects[DB.current]; }
+
+/* ---------- Hilfen ---------- */
+function toast(msg){
+  const t = document.getElementById("toast");
+  t.textContent = msg; t.classList.add("show");
+  clearTimeout(t._t); t._t = setTimeout(()=>t.classList.remove("show"), 1800);
+}
+function esc(s){ return (s||"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
+function initials(name){
+  const p=(name||"?").trim().split(/\s+/);
+  return ((p[0]?.[0]||"")+(p.length>1?p[p.length-1][0]:"")).toUpperCase()||"?";
+}
+function wordCount(s){ const m=(s||"").trim().match(/\S+/g); return m?m.length:0; }
+function projWordCount(){
+  return proj().chapters.reduce((a,c)=>a+c.scenes.reduce((b,s)=>b+wordCount(s.text),0),0);
+}
+function findEntity(id){
+  const p=proj();
+  return p.characters.find(x=>x.id===id)||p.places.find(x=>x.id===id)||p.elements.find(x=>x.id===id);
+}
+function entityKind(id){
+  const p=proj();
+  if(p.characters.some(x=>x.id===id))return"character";
+  if(p.places.some(x=>x.id===id))return"place";
+  if(p.elements.some(x=>x.id===id))return"element";
+  return null;
+}
+
+/* ---------- Automatische Erkennung von Namen im Text ---------- */
+function namesFor(entity){
+  const list = [entity.name, ...((entity.aliases||"").split(",").map(s=>s.trim()).filter(Boolean))];
+  return list.filter(n=>n && n.length>=2);
+}
+function escRe(s){ return s.replace(/[.*+?^${}()|[\]\\]/g,"\\$&"); }
+function detectInText(text){
+  const p=proj(); const t=text||"";
+  const hitChars=[], hitPlaces=[];
+  for(const c of p.characters){
+    if(namesFor(c).some(n=>new RegExp("(^|[^\\wäöüß])"+escRe(n)+"([^\\wäöüß]|$)","i").test(t))) hitChars.push(c);
+  }
+  for(const pl of p.places){
+    if(namesFor(pl).some(n=>new RegExp("(^|[^\\wäöüß])"+escRe(n)+"([^\\wäöüß]|$)","i").test(t))) hitPlaces.push(pl);
+  }
+  return {characters:hitChars, places:hitPlaces};
+}
+// In welchen Szenen kommt eine Entität vor?
+function scenesWith(entityId){
+  const p=proj(); const ent=findEntity(entityId); if(!ent) return [];
+  const out=[];
+  for(const ch of p.chapters) for(const sc of ch.scenes){
+    const det = detectInText(sc.text);
+    if(det.characters.some(x=>x.id===entityId)||det.places.some(x=>x.id===entityId))
+      out.push({chapter:ch, scene:sc});
+  }
+  return out;
+}
+
+/* ============================================================
+   Navigation & Rendering
+   ============================================================ */
+let VIEW = "dashboard";
+let EDIT_SCENE = null; // {chapterId, sceneId}
+
+const NAV = [
+  {id:"dashboard", ico:"🏠", label:"Übersicht"},
+  {id:"manuscript", ico:"📖", label:"Manuskript", count:()=>proj().chapters.reduce((a,c)=>a+c.scenes.length,0)},
+  {id:"characters", ico:"👤", label:"Figuren", count:()=>proj().characters.length},
+  {id:"places", ico:"🗺️", label:"Orte", count:()=>proj().places.length},
+  {id:"elements", ico:"✦", label:"Weltelemente", count:()=>proj().elements.length},
+  {id:"relations", ico:"🔗", label:"Beziehungen", count:()=>proj().relationships.length},
+  {id:"ideas", ico:"💡", label:"Ideen & Struktur", count:()=>proj().ideas.filter(i=>!i.done).length},
+  {id:"notes", ico:"🗒️", label:"Notizen"},
+];
+
+function renderNav(){
+  const nav=document.getElementById("nav");
+  nav.innerHTML = NAV.map(n=>{
+    const c = n.count ? `<span class="count">${n.count()}</span>`:"";
+    return `<button data-view="${n.id}" class="${VIEW===n.id?'active':''}">
+      <span class="ico">${n.ico}</span><span>${n.label}</span>${c}</button>`;
+  }).join("");
+  nav.querySelectorAll("button").forEach(b=>b.onclick=()=>go(b.dataset.view));
+
+  const sel=document.getElementById("projectSelect");
+  sel.innerHTML = Object.values(DB.projects)
+    .map(p=>`<option value="${p.id}" ${p.id===DB.current?"selected":""}>${esc(p.meta.title)}</option>`).join("");
+  sel.onchange = ()=>{ DB.current=sel.value; save(); go("dashboard"); };
+}
+function go(view){ VIEW=view; render(); }
+function render(){ renderNav(); document.getElementById("main").innerHTML=""; VIEWS[VIEW](); }
+
+/* ============================================================
+   Ansichten
+   ============================================================ */
+const VIEWS = {};
+
+/* ---------- Dashboard ---------- */
+VIEWS.dashboard = ()=>{
+  const p=proj();
+  const scenes = p.chapters.reduce((a,c)=>a+c.scenes.length,0);
+  const done = p.chapters.reduce((a,c)=>a+c.scenes.filter(s=>s.status==="done").length,0);
+  const words = projWordCount();
+  const pct = scenes? Math.round(done/scenes*100):0;
+  const m = mount();
+  m.innerHTML = `
+    <div class="row"><h2>${esc(p.meta.title)}</h2><div class="spacer"></div>
+      <button class="btn small" id="editMeta">Projekt bearbeiten</button></div>
+    <p class="lead">${p.meta.logline? esc(p.meta.logline) :
+        "Noch keine Logline. Beschreibe deine Geschichte in einem Satz – das gibt dir Richtung."}</p>
+
+    <div class="stats">
+      <div class="stat"><div class="n">${words.toLocaleString('de-DE')}</div><div class="l">Wörter</div></div>
+      <div class="stat"><div class="n">${scenes}</div><div class="l">Szenen</div></div>
+      <div class="stat"><div class="n">${p.characters.length}</div><div class="l">Figuren</div></div>
+      <div class="stat"><div class="n">${p.places.length}</div><div class="l">Orte</div></div>
+      <div class="stat"><div class="n">${pct}%</div><div class="l">fertige Szenen
+        <div class="progressbar"><i style="width:${pct}%"></i></div></div></div>
+    </div>
+
+    <div class="grid cols">
+      <div class="card">
+        <h3>Worum geht es?</h3>
+        <p>${p.meta.premise? esc(p.meta.premise).replace(/\n/g,"<br>") :
+            "Halte in ein bis zwei Sätzen fest, was das Herz deiner Geschichte ist. Klick auf „Projekt bearbeiten“."}</p>
+        ${p.meta.genre?`<div style="margin-top:10px"><span class="tag role">${esc(p.meta.genre)}</span></div>`:""}
+      </div>
+      <div class="card">
+        <h3>Nächste Schritte</h3>
+        <div class="link-list" style="margin-top:8px">
+          ${scenes===0?'<div>• <span class="lk" data-go="manuscript">Erste Szene schreiben</span></div>':''}
+          ${p.characters.length===0?'<div>• <span class="lk" data-go="characters">Hauptfigur anlegen</span></div>':''}
+          ${!p.meta.logline?'<div>• <span class="lk" data-meta="1">Logline formulieren</span></div>':''}
+          ${p.ideas.filter(i=>!i.done).length?'<div>• <span class="lk" data-go="ideas">Offene Ideen ansehen</span></div>':''}
+          <div>• <span class="lk" data-go="ideas">Story-Struktur planen</span></div>
+        </div>
+      </div>
+      <div class="card">
+        <h3>Zuletzt bearbeitet</h3>
+        <div class="link-list" style="margin-top:8px">
+          ${recentScenes().map(r=>`<div>• <span class="lk" data-scene="${r.chapter.id}:${r.scene.id}">${esc(r.scene.title||"Ohne Titel")}</span> <span class="muted">(${wordCount(r.scene.text)} W.)</span></div>`).join("")||'<span class="muted">Noch nichts geschrieben.</span>'}
+        </div>
+      </div>
+    </div>`;
+  m.querySelector("#editMeta").onclick=openMeta;
+  m.querySelectorAll("[data-go]").forEach(e=>e.onclick=()=>go(e.dataset.go));
+  m.querySelectorAll("[data-meta]").forEach(e=>e.onclick=openMeta);
+  m.querySelectorAll("[data-scene]").forEach(e=>e.onclick=()=>{
+    const [c,s]=e.dataset.scene.split(":"); openScene(c,s);
+  });
+};
+function recentScenes(){
+  const out=[];
+  proj().chapters.forEach(c=>c.scenes.forEach(s=>out.push({chapter:c,scene:s})));
+  return out.filter(r=>r.scene.text||r.scene.title).slice(-4).reverse();
+}
+function openMeta(){
+  const p=proj();
+  modal(`<h3>Projekt bearbeiten</h3>
+    <label class="f"><span class="lbl">Titel</span><input class="in" id="mTitle" value="${esc(p.meta.title)}"></label>
+    <div class="two">
+      <label class="f"><span class="lbl">Genre</span><input class="in" id="mGenre" value="${esc(p.meta.genre)}" placeholder="z. B. Fantasy, Krimi"></label>
+      <label class="f"><span class="lbl">Logline (ein Satz)</span><input class="in" id="mLog" value="${esc(p.meta.logline)}" placeholder="Ein X muss Y, weil Z."></label>
+    </div>
+    <label class="f"><span class="lbl">Worum geht es? (Prämisse)</span><textarea class="in" id="mPrem" placeholder="Das Herz deiner Geschichte in ein paar Sätzen.">${esc(p.meta.premise)}</textarea></label>`,
+    ()=>{
+      p.meta.title=val("mTitle")||"Ohne Titel"; p.meta.genre=val("mGenre");
+      p.meta.logline=val("mLog"); p.meta.premise=val("mPrem"); save(); render();
+    });
+}
+
+/* ---------- Manuskript ---------- */
+VIEWS.manuscript = ()=>{
+  const p=proj();
+  const m=document.getElementById("main");
+  if(p.chapters.length===0){
+    const v=mount();
+    v.innerHTML=`<h2>Manuskript</h2>
+      <p class="lead">Deine Geschichte entsteht in Kapiteln und Szenen – wie im Karteikasten eines Autorenprogramms. Fang mit einer einzigen Szene an; alles andere kannst du später umsortieren.</p>
+      <div class="empty"><div class="big">📖</div>
+        <p>Noch keine Kapitel.</p>
+        <button class="btn primary" id="firstCh">Erstes Kapitel anlegen</button></div>`;
+    v.querySelector("#firstCh").onclick=()=>{ addChapter(); };
+    return;
+  }
+  // pick a scene if none
+  if(!EDIT_SCENE){
+    const first=p.chapters.find(c=>c.scenes.length);
+    if(first) EDIT_SCENE={chapterId:first.id, sceneId:first.scenes[0].id};
+  }
+  m.innerHTML=`<div class="ms">
+    <div class="binder" id="binder"></div>
+    <div class="editor-wrap" id="editorWrap"></div></div>`;
+  renderBinder(); renderEditor();
+};
+function renderBinder(){
+  const p=proj(); const b=document.getElementById("binder");
+  b.innerHTML = `<h4>Manuskript <span class="spacer"></span></h4>` +
+    p.chapters.map(ch=>`
+      <div class="chapter" data-ch="${ch.id}">
+        <div class="chapter-h">
+          <span class="ttl" data-editch="${ch.id}">${esc(ch.title||"Kapitel")}</span>
+          <button class="btn ghost small" data-addsc="${ch.id}" title="Szene hinzufügen">＋</button>
+        </div>
+        ${ch.scenes.map(sc=>`
+          <div class="scene-item ${EDIT_SCENE&&EDIT_SCENE.sceneId===sc.id?'active':''}" data-open="${ch.id}:${sc.id}">
+            <span class="dot ${sc.status||'todo'}"></span>
+            <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(sc.title||"Ohne Titel")}</span>
+          </div>`).join("")}
+      </div>`).join("") +
+    `<div style="padding:10px 8px"><button class="btn small" id="addChapter">＋ Kapitel</button></div>`;
+  b.querySelector("#addChapter").onclick=addChapter;
+  b.querySelectorAll("[data-addsc]").forEach(e=>e.onclick=()=>addScene(e.dataset.addsc));
+  b.querySelectorAll("[data-open]").forEach(e=>e.onclick=()=>{
+    const[c,s]=e.dataset.open.split(":"); EDIT_SCENE={chapterId:c,sceneId:s}; renderBinder(); renderEditor();
+  });
+  b.querySelectorAll("[data-editch]").forEach(e=>e.onclick=()=>renameChapter(e.dataset.editch));
+}
+function renderEditor(){
+  const w=document.getElementById("editorWrap");
+  if(!EDIT_SCENE){ w.innerHTML=`<div class="empty" style="margin:auto"><p>Wähle links eine Szene oder lege eine neue an.</p></div>`; return; }
+  const p=proj(); const ch=p.chapters.find(c=>c.id===EDIT_SCENE.chapterId);
+  const sc=ch?.scenes.find(s=>s.id===EDIT_SCENE.sceneId);
+  if(!sc){ EDIT_SCENE=null; return renderEditor(); }
+  const povChars = p.characters.map(c=>`<option value="${c.id}" ${sc.pov===c.id?"selected":""}>${esc(c.name)}</option>`).join("");
+  w.innerHTML=`
+    <div class="editor-bar">
+      <input class="title" id="scTitle" value="${esc(sc.title||"")}" placeholder="Szenentitel">
+      <span class="pill" id="wc">${wordCount(sc.text)} Wörter</span>
+      <select class="status-sel" id="scStatus">
+        <option value="todo" ${sc.status==="todo"||!sc.status?"selected":""}>· Idee</option>
+        <option value="draft" ${sc.status==="draft"?"selected":""}>✎ Entwurf</option>
+        <option value="done" ${sc.status==="done"?"selected":""}>✓ Fertig</option>
+      </select>
+      <select class="status-sel" id="scPov"><option value="">POV wählen…</option>${povChars}</select>
+      <button class="btn ghost small" id="delScene" title="Szene löschen">🗑</button>
+    </div>
+    <div class="editor-body">
+      <textarea class="scene-summary" id="scSummary" placeholder="Kurz: Was passiert in dieser Szene? (Hilft beim Überblick)">${esc(sc.summary||"")}</textarea>
+      <textarea id="scText" placeholder="Schreib hier deine Szene…">${esc(sc.text||"")}</textarea>
+    </div>
+    <div class="detected" id="detected"></div>`;
+  const ta=w.querySelector("#scText");
+  const upd=()=>{
+    sc.text=ta.value; w.querySelector("#wc").textContent=wordCount(sc.text)+" Wörter";
+    renderDetected(sc); save();
+  };
+  ta.oninput=debounce(upd,250);
+  autoGrow(ta);
+  w.querySelector("#scTitle").oninput=debounce(e=>{ sc.title=e.target.value; save(); renderBinder(); },300);
+  w.querySelector("#scSummary").oninput=debounce(e=>{ sc.summary=e.target.value; save(); },400);
+  w.querySelector("#scStatus").onchange=e=>{ sc.status=e.target.value; save(); renderBinder(); };
+  w.querySelector("#scPov").onchange=e=>{ sc.pov=e.target.value; save(); };
+  w.querySelector("#delScene").onclick=()=>{
+    if(confirm("Diese Szene löschen?")){ ch.scenes=ch.scenes.filter(s=>s.id!==sc.id); EDIT_SCENE=null; save(); VIEWS.manuscript(); }
+  };
+  renderDetected(sc);
+}
+function renderDetected(sc){
+  const el=document.getElementById("detected"); if(!el) return;
+  const det=detectInText(sc.text);
+  const chips=[
+    ...det.characters.map(c=>`<span class="chip" data-ent="${c.id}">👤 ${esc(c.name)}</span>`),
+    ...det.places.map(pl=>`<span class="chip" data-ent="${pl.id}">🗺️ ${esc(pl.name)}</span>`)
+  ];
+  el.innerHTML = chips.length
+    ? `<strong>Automatisch erkannt in dieser Szene:</strong> ${chips.join("")}`
+    : `<span class="muted">Sobald du Namen deiner Figuren oder Orte schreibst, verknüpft Federwerk sie hier automatisch.</span>`;
+  el.querySelectorAll("[data-ent]").forEach(c=>c.onclick=()=>openEntity(c.dataset.ent));
+}
+function addChapter(){
+  const p=proj();
+  const ch={id:uid(), title:"Kapitel "+(p.chapters.length+1), scenes:[]};
+  p.chapters.push(ch); save();
+  addScene(ch.id);
+}
+function addScene(chId){
+  const ch=proj().chapters.find(c=>c.id===chId); if(!ch) return;
+  const sc={id:uid(), title:"Neue Szene", text:"", summary:"", status:"todo", pov:""};
+  ch.scenes.push(sc); EDIT_SCENE={chapterId:chId, sceneId:sc.id}; save();
+  VIEWS.manuscript();
+}
+function renameChapter(id){
+  const ch=proj().chapters.find(c=>c.id===id); if(!ch) return;
+  modal(`<h3>Kapitel</h3>
+    <label class="f"><span class="lbl">Titel</span><input class="in" id="chT" value="${esc(ch.title)}"></label>
+    <button class="btn danger" id="delCh" style="margin-top:14px">Kapitel löschen</button>`,
+    ()=>{ ch.title=val("chT")||"Kapitel"; save(); VIEWS.manuscript(); },
+    (root)=>{ root.querySelector("#delCh").onclick=()=>{
+      if(confirm("Kapitel mit allen Szenen löschen?")){
+        proj().chapters=proj().chapters.filter(c=>c.id!==id); EDIT_SCENE=null; save(); closeModal(); VIEWS.manuscript();
+      }};
+    });
+}
+
+/* ---------- Figuren / Orte / Elemente (generisch) ---------- */
+const CHAR_FIELDS = [
+  {k:"role", l:"Rolle", ph:"z. B. Heldin, Gegenspieler, Mentor"},
+  {k:"aliases", l:"Weitere Namen / Spitznamen (Komma-getrennt)", ph:"für die automatische Erkennung"},
+  {k:"age", l:"Alter / Erscheinung", ph:""},
+  {k:"goal", l:"Was will die Figur? (Ziel)", ph:"Der Motor der Figur", area:true},
+  {k:"conflict", l:"Was steht im Weg? (Konflikt)", ph:"Innerer oder äußerer Widerstand", area:true},
+  {k:"arc", l:"Wandlung (Figurenbogen)", ph:"Wer ist sie am Anfang – wer am Ende?", area:true},
+  {k:"backstory", l:"Hintergrund", ph:"", area:true},
+  {k:"notes", l:"Notizen", ph:"", area:true},
+];
+const PLACE_FIELDS = [
+  {k:"type", l:"Art des Ortes", ph:"z. B. Stadt, Wald, Raumschiff"},
+  {k:"aliases", l:"Weitere Namen (Komma-getrennt)", ph:"für die automatische Erkennung"},
+  {k:"description", l:"Beschreibung / Atmosphäre", ph:"Was macht diesen Ort besonders?", area:true},
+  {k:"notes", l:"Notizen", ph:"", area:true},
+];
+const ELEM_FIELDS = [
+  {k:"category", l:"Kategorie", ph:"z. B. Gegenstand, Magie, Organisation, Technik"},
+  {k:"aliases", l:"Weitere Namen (Komma-getrennt)", ph:"für die automatische Erkennung"},
+  {k:"description", l:"Beschreibung", ph:"", area:true},
+  {k:"notes", l:"Notizen", ph:"", area:true},
+];
+
+function collectionView(cfg){
+  const p=proj(); const list=p[cfg.key]; const m=mount();
+  m.innerHTML=`<div class="row"><h2>${cfg.title}</h2><div class="spacer"></div>
+      <button class="btn primary" id="addNew">＋ ${cfg.singular}</button></div>
+    <p class="lead">${cfg.lead}</p>
+    <div class="grid cols" id="cards"></div>`;
+  m.querySelector("#addNew").onclick=()=>openEntityForm(cfg, null);
+  const cards=m.querySelector("#cards");
+  if(list.length===0){
+    cards.innerHTML=`<div class="empty" style="grid-column:1/-1"><div class="big">${cfg.emoji}</div>
+      <p>Noch keine ${cfg.title.toLowerCase()}.</p>
+      <button class="btn" id="addE">${cfg.singular} anlegen</button></div>`;
+    cards.querySelector("#addE").onclick=()=>openEntityForm(cfg,null);
+    return;
+  }
+  cards.innerHTML=list.map(e=>{
+    const appear=scenesWith(e.id).length;
+    const sub = cfg.key==="characters"? (e.role||"") : (e.type||e.category||"");
+    return `<div class="card entity-card" data-id="${e.id}">
+      <div class="row">
+        <div class="avatar ${cfg.key!=='characters'?'sq':''}">${cfg.key==='characters'?initials(e.name):cfg.emoji}</div>
+        <div style="flex:1;min-width:0">
+          <h3 style="margin:0">${esc(e.name)}</h3>
+          ${sub?`<span class="tag role">${esc(sub)}</span>`:""}
+        </div>
+      </div>
+      ${previewText(e,cfg)}
+      <p class="muted" style="margin-top:10px;font-size:12px">
+        ${appear?`kommt in ${appear} Szene${appear>1?"n":""} vor`:"noch in keiner Szene"}</p>
+    </div>`;
+  }).join("");
+  cards.querySelectorAll(".entity-card").forEach(c=>c.onclick=()=>openEntity(c.dataset.id));
+}
+function previewText(e,cfg){
+  const t = e.goal||e.description||e.backstory||e.notes||"";
+  return t? `<p>${esc(t.slice(0,120))}${t.length>120?"…":""}</p>`:"";
+}
+VIEWS.characters=()=>collectionView({key:"characters",title:"Figuren",singular:"Figur",emoji:"👤",
+  fields:CHAR_FIELDS, lead:"Deine Figuren – wer treibt die Geschichte an? Gib jeder Figur ein Ziel und einen Konflikt, das macht sie lebendig."});
+VIEWS.places=()=>collectionView({key:"places",title:"Orte",singular:"Ort",emoji:"🗺️",
+  fields:PLACE_FIELDS, lead:"Die Schauplätze deiner Welt. Je greifbarer ein Ort, desto stärker die Szene."});
+VIEWS.elements=()=>collectionView({key:"elements",title:"Weltelemente",singular:"Element",emoji:"✦",
+  fields:ELEM_FIELDS, lead:"Alles Übrige deiner Welt: Gegenstände, Organisationen, Magiesysteme, Technik, Regeln."});
+
+const CFG_BY_KEY = {
+  characters:{key:"characters",title:"Figuren",singular:"Figur",emoji:"👤",fields:CHAR_FIELDS},
+  places:{key:"places",title:"Orte",singular:"Ort",emoji:"🗺️",fields:PLACE_FIELDS},
+  elements:{key:"elements",title:"Weltelemente",singular:"Element",emoji:"✦",fields:ELEM_FIELDS},
+};
+function cfgFor(id){ const k=entityKind(id); return CFG_BY_KEY[{character:"characters",place:"places",element:"elements"}[k]]; }
+
+function openEntityForm(cfg, entity){
+  const isNew=!entity; const e=entity||{id:uid(), name:""};
+  const fieldsHtml = `
+    <label class="f"><span class="lbl">Name</span><input class="in" id="f_name" value="${esc(e.name)}" placeholder="Name"></label>` +
+    cfg.fields.map(f=>`<label class="f"><span class="lbl">${f.l}</span>${
+      f.area? `<textarea class="in" id="f_${f.k}" placeholder="${esc(f.ph)}">${esc(e[f.k]||"")}</textarea>`
+            : `<input class="in" id="f_${f.k}" value="${esc(e[f.k]||"")}" placeholder="${esc(f.ph)}">`}</label>`).join("");
+  modal(`<h3>${isNew?cfg.singular+" anlegen":esc(e.name)}</h3>${fieldsHtml}`,
+    ()=>{
+      e.name = val("f_name")||"Ohne Namen";
+      cfg.fields.forEach(f=> e[f.k]=val("f_"+f.k));
+      if(isNew) proj()[cfg.key].push(e);
+      save(); render();
+      if(!isNew) openEntity(e.id);
+    });
+}
+
+function openEntity(id){
+  const cfg=cfgFor(id); const e=findEntity(id); if(!e){ return; }
+  const appear=scenesWith(id);
+  const rels=relationsOf(id);
+  const detailFields = cfg.fields.filter(f=>f.k!=="aliases" && (e[f.k]||"").trim())
+    .map(f=>`<div style="margin-top:14px"><div class="card-lbl" style="font-size:12px;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.5px">${f.l}</div>
+       <div style="margin-top:3px;white-space:pre-wrap">${esc(e[f.k])}</div></div>`).join("");
+  modal(`
+    <div class="row">
+      <div class="avatar ${cfg.key!=='characters'?'sq':''}">${cfg.key==='characters'?initials(e.name):cfg.emoji}</div>
+      <div style="flex:1"><h3 style="margin:0">${esc(e.name)}</h3>
+        <div class="muted" style="font-size:13px">${esc(e.role||e.type||e.category||cfg.singular)}</div></div>
+    </div>
+    ${e.aliases?`<div style="margin-top:10px">${e.aliases.split(",").map(a=>a.trim()).filter(Boolean).map(a=>`<span class="tag">${esc(a)}</span>`).join("")}</div>`:""}
+    ${detailFields||'<p class="muted" style="margin-top:14px">Noch keine Details ausgefüllt.</p>'}
+    <div class="divider"></div>
+    <div class="two">
+      <div>
+        <div class="lbl" style="font-size:12px;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.5px">Kommt vor in</div>
+        <div class="link-list" style="margin-top:6px">
+          ${appear.length? appear.map(a=>`<div>• <span class="lk" data-sc="${a.chapter.id}:${a.scene.id}">${esc(a.scene.title||"Szene")}</span> <span class="muted">(${esc(a.chapter.title)})</span></div>`).join("")
+            : '<span class="muted">In noch keiner Szene erwähnt.</span>'}
+        </div>
+      </div>
+      <div>
+        <div class="lbl" style="font-size:12px;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.5px">Beziehungen</div>
+        <div class="link-list" style="margin-top:6px">
+          ${rels.length? rels.map(r=>`<div>• <span class="muted">${esc(r.label||r.type||"verbunden mit")}</span> <span class="lk" data-ent="${r.otherId}">${esc(r.otherName)}</span></div>`).join("")
+            : '<span class="muted">Noch keine Beziehungen. <span class="lk" data-relnew="1">anlegen</span></span>'}
+        </div>
+      </div>
+    </div>`,
+    null,
+    (root)=>{
+      // footer custom
+      const foot=root.querySelector(".foot");
+      foot.innerHTML=`<button class="btn danger" id="delE">Löschen</button>
+        <div class="spacer" style="flex:1"></div>
+        <button class="btn" id="editE">Bearbeiten</button>
+        <button class="btn ghost" onclick="closeModal()">Schließen</button>`;
+      root.querySelector("#editE").onclick=()=>{ closeModal(); openEntityForm(cfg,e); };
+      root.querySelector("#delE").onclick=()=>{
+        if(confirm('„'+e.name+'“ löschen?')){
+          proj()[cfg.key]=proj()[cfg.key].filter(x=>x.id!==id);
+          proj().relationships=proj().relationships.filter(r=>r.from!==id&&r.to!==id);
+          save(); closeModal(); render();
+        }
+      };
+      root.querySelectorAll("[data-sc]").forEach(x=>x.onclick=()=>{ closeModal(); const[c,s]=x.dataset.sc.split(":"); openScene(c,s); });
+      root.querySelectorAll("[data-ent]").forEach(x=>x.onclick=()=>{ closeModal(); openEntity(x.dataset.ent); });
+      root.querySelectorAll("[data-relnew]").forEach(x=>x.onclick=()=>{ closeModal(); openRelForm(null, id); });
+    }, true /* no default save button */);
+}
+function openScene(chId, scId){ EDIT_SCENE={chapterId:chId, sceneId:scId}; go("manuscript"); }
+
+/* ---------- Beziehungen ---------- */
+function relationsOf(id){
+  const p=proj(); const out=[];
+  for(const r of p.relationships){
+    if(r.from===id){ const o=findEntity(r.to); if(o) out.push({...r, otherId:r.to, otherName:o.name}); }
+    else if(r.to===id){ const o=findEntity(r.from); if(o) out.push({...r, otherId:r.from, otherName:o.name, label:r.labelRev||r.label}); }
+  }
+  return out;
+}
+VIEWS.relations = ()=>{
+  const p=proj(); const m=mount();
+  const nodes = [...p.characters, ...p.places, ...p.elements];
+  m.innerHTML=`<div class="row"><h2>Beziehungen</h2><div class="spacer"></div>
+      <button class="btn primary" id="addRel">＋ Beziehung</button></div>
+    <p class="lead">Verbinde Figuren, Orte und Elemente miteinander – wer kennt wen, wer gehört wohin. Das Diagramm zeigt dein Beziehungsgeflecht auf einen Blick.</p>`;
+  if(nodes.length<2){
+    m.innerHTML+=`<div class="empty"><div class="big">🔗</div><p>Lege zuerst mindestens zwei Figuren oder Orte an, um sie zu verbinden.</p></div>`;
+    m.querySelector("#addRel").onclick=()=>{ toast("Zuerst Figuren/Orte anlegen."); };
+    return;
+  }
+  m.innerHTML+=`<div class="graph-wrap" style="margin-bottom:22px"><div id="graph"></div></div>
+    <h3 style="font-family:var(--serif)">Alle Verbindungen</h3>
+    <div id="relList"></div>`;
+  m.querySelector("#addRel").onclick=()=>openRelForm(null);
+  drawGraph(document.getElementById("graph"), nodes);
+  const rl=m.querySelector("#relList");
+  if(p.relationships.length===0){ rl.innerHTML='<p class="muted">Noch keine Beziehungen angelegt.</p>'; }
+  else rl.innerHTML=p.relationships.map(r=>{
+    const a=findEntity(r.from), b=findEntity(r.to); if(!a||!b) return "";
+    return `<div class="rel-item">
+      <span class="lk" data-ent="${a.id}" style="color:var(--accent);cursor:pointer">${esc(a.name)}</span>
+      <span class="muted">— ${esc(r.label||r.type||"verbunden mit")} →</span>
+      <span class="lk" data-ent="${b.id}" style="color:var(--accent);cursor:pointer">${esc(b.name)}</span>
+      <div class="spacer" style="flex:1"></div>
+      <button class="btn ghost small" data-edit="${r.id}">bearbeiten</button>
+      <button class="btn ghost small" data-del="${r.id}">🗑</button>
+    </div>`;
+  }).join("");
+  rl.querySelectorAll("[data-ent]").forEach(x=>x.onclick=()=>openEntity(x.dataset.ent));
+  rl.querySelectorAll("[data-edit]").forEach(x=>x.onclick=()=>openRelForm(x.dataset.edit));
+  rl.querySelectorAll("[data-del]").forEach(x=>x.onclick=()=>{
+    proj().relationships=proj().relationships.filter(r=>r.id!==x.dataset.del); save(); VIEWS.relations();
+  });
+};
+function openRelForm(relId, presetFrom){
+  const p=proj();
+  const rel = relId? p.relationships.find(r=>r.id===relId) : {id:uid(), from:presetFrom||"", to:"", type:"", label:""};
+  const opts=(sel)=>[...p.characters,...p.places,...p.elements]
+    .map(e=>`<option value="${e.id}" ${sel===e.id?"selected":""}>${esc(e.name)}</option>`).join("");
+  modal(`<h3>${relId?"Beziehung bearbeiten":"Neue Beziehung"}</h3>
+    <div class="two">
+      <label class="f"><span class="lbl">Von</span><select class="in" id="rFrom"><option value="">wählen…</option>${opts(rel.from)}</select></label>
+      <label class="f"><span class="lbl">Zu</span><select class="in" id="rTo"><option value="">wählen…</option>${opts(rel.to)}</select></label>
+    </div>
+    <label class="f"><span class="lbl">Art der Beziehung</span><input class="in" id="rLabel" value="${esc(rel.label||"")}" placeholder="z. B. Schwester von, verliebt in, wohnt in, Feind von"></label>
+    <div class="muted" style="font-size:13px;margin-top:8px">Tipp: Beschreibe die Beziehung aus Sicht von „Von → Zu".</div>`,
+    ()=>{
+      rel.from=val("rFrom"); rel.to=val("rTo"); rel.label=val("rLabel");
+      if(!rel.from||!rel.to||rel.from===rel.to){ toast("Bitte zwei verschiedene Einträge wählen."); return false; }
+      if(!relId) p.relationships.push(rel);
+      save(); VIEWS.relations();
+    });
+}
+function drawGraph(container, nodes){
+  const p=proj();
+  const W=container.clientWidth||760, H=Math.max(320, Math.min(520, 120+nodes.length*26));
+  const cx=W/2, cy=H/2, R=Math.min(W,H)/2-60;
+  const pos={};
+  nodes.forEach((n,i)=>{
+    const ang=(i/nodes.length)*Math.PI*2 - Math.PI/2;
+    pos[n.id]={x:cx+R*Math.cos(ang), y:cy+R*Math.sin(ang), n};
+  });
+  const edges=p.relationships.map(r=>{
+    if(!pos[r.from]||!pos[r.to]) return "";
+    const a=pos[r.from], b=pos[r.to];
+    const mx=(a.x+b.x)/2, my=(a.y+b.y)/2;
+    return `<line class="edge" x1="${a.x}" y1="${a.y}" x2="${b.x}" y2="${b.y}"></line>
+      <text class="edge-label" x="${mx}" y="${my-3}" text-anchor="middle">${esc((r.label||"").slice(0,22))}</text>`;
+  }).join("");
+  const nodeSvg=nodes.map(n=>{
+    const pt=pos[n.id]; const isChar=p.characters.some(c=>c.id===n.id);
+    const lbl=n.name.length>16?n.name.slice(0,15)+"…":n.name;
+    return `<g class="node" data-ent="${n.id}">
+      <circle cx="${pt.x}" cy="${pt.y}" r="22"></circle>
+      <text x="${pt.x}" y="${pt.y+4}" text-anchor="middle" font-family="var(--serif)" font-weight="600">${isChar?initials(n.name):(isChar?"":"✦")}</text>
+      <text x="${pt.x}" y="${pt.y+38}" text-anchor="middle">${esc(lbl)}</text>
+    </g>`;
+  }).join("");
+  container.innerHTML=`<svg class="graph" viewBox="0 0 ${W} ${H}" style="height:${H}px">${edges}${nodeSvg}</svg>`;
+  container.querySelectorAll(".node").forEach(g=>g.onclick=()=>openEntity(g.dataset.ent));
+}
+
+/* ---------- Ideen & Struktur ---------- */
+const PROMPTS = [
+  "Wenn deine Geschichte eine Frage stellt – welche ist es?",
+  "Was ist das Schlimmste, das deiner Hauptfigur passieren könnte?",
+  "Was will deine Figur unbedingt – und was braucht sie wirklich?",
+  "Welche Entscheidung kann deine Figur nicht mehr rückgängig machen?",
+  "Was steht auf dem Spiel, wenn die Figur scheitert?",
+  "Wie sieht die Welt am Ende anders aus als am Anfang?",
+  "Wer ist der Gegenspieler – und warum hält er sich selbst für im Recht?",
+  "Welches Geheimnis verändert alles, wenn es herauskommt?",
+];
+const BEATS = [
+  {t:"Ausgangslage", d:"Zeig die normale Welt deiner Figur – bevor alles ins Rollen kommt."},
+  {t:"Auslösendes Ereignis", d:"Etwas stört das Gleichgewicht. Die Geschichte beginnt wirklich."},
+  {t:"Aufbruch / Entscheidung", d:"Die Figur nimmt die Herausforderung an (oder wird gezwungen)."},
+  {t:"Steigende Hindernisse", d:"Es wird schwerer. Rückschläge, neue Verbündete und Gegner."},
+  {t:"Wendepunkt / Krise", d:"Der Tiefpunkt oder die große Enthüllung. Nichts ist mehr wie zuvor."},
+  {t:"Höhepunkt", d:"Die entscheidende Konfrontation. Alles läuft zusammen."},
+  {t:"Auflösung", d:"Wie geht es aus? Was hat sich verändert?"},
+];
+VIEWS.ideas = ()=>{
+  const p=proj(); const m=mount();
+  const promptIdx = (projWordCount()+p.ideas.length) % PROMPTS.length;
+  m.innerHTML=`<h2>Ideen &amp; Struktur</h2>
+    <p class="lead">Hier wird aus einem Gedanken eine Geschichte. Sammle lose Einfälle, beantworte Leitfragen und plane grob den Aufbau – ganz ohne Druck.</p>
+
+    <div class="prompt-box">
+      <div class="q">💭 ${PROMPTS[promptIdx]}</div>
+      <div class="row"><input class="in" id="promptAns" placeholder="Deine Antwort wird als Idee gespeichert…">
+        <button class="btn primary" id="savePrompt">Festhalten</button>
+        <button class="btn ghost" id="nextPrompt">Andere Frage</button></div>
+    </div>
+
+    <div class="two" style="align-items:start">
+      <div>
+        <h3 style="font-family:var(--serif)">Ideenspeicher</h3>
+        <div class="row" style="margin:10px 0">
+          <input class="in" id="ideaIn" placeholder="Neue Idee, Szene, Was-wäre-wenn…">
+          <button class="btn" id="addIdea">＋</button>
+        </div>
+        <div id="ideaList"></div>
+      </div>
+      <div>
+        <h3 style="font-family:var(--serif)">Aufbau in 7 Schritten</h3>
+        <p class="muted" style="font-size:13px">Eine einfache Struktur für den Einstieg. Nutze sie als Landkarte, nicht als Korsett.</p>
+        <div class="card" style="margin-top:10px">
+          ${BEATS.map((b,i)=>`<div class="beat"><div class="num">${i+1}</div>
+            <div><div class="bt">${b.t}</div><div class="bd">${b.d}</div>
+            <textarea class="in" data-beat="${i}" style="margin-top:6px;min-height:44px" placeholder="Deine Notizen…">${esc((p.structure&&p.structure[i])||"")}</textarea>
+            </div></div>`).join("")}
+        </div>
+      </div>
+    </div>`;
+  const renderIdeas=()=>{
+    const il=m.querySelector("#ideaList");
+    if(p.ideas.length===0){ il.innerHTML='<p class="muted">Noch keine Ideen. Schreib einfach drauflos – nichts ist zu klein.</p>'; return; }
+    il.innerHTML=p.ideas.map(i=>`<div class="idea ${i.done?'done':''}">
+      <input type="checkbox" data-done="${i.id}" ${i.done?'checked':''}>
+      <div class="txt">${esc(i.text)}</div>
+      <button class="btn ghost small" data-delidea="${i.id}">🗑</button></div>`).join("");
+    il.querySelectorAll("[data-done]").forEach(c=>c.onchange=()=>{
+      const it=p.ideas.find(x=>x.id===c.dataset.done); it.done=c.checked; save(); renderIdeas(); renderNav();
+    });
+    il.querySelectorAll("[data-delidea]").forEach(b=>b.onclick=()=>{
+      p.ideas=p.ideas.filter(x=>x.id!==b.dataset.delidea); save(); renderIdeas(); renderNav();
+    });
+  };
+  renderIdeas();
+  const addIdea=(text)=>{ if(!text.trim())return; p.ideas.unshift({id:uid(),text:text.trim(),done:false}); save(); renderIdeas(); renderNav(); };
+  m.querySelector("#addIdea").onclick=()=>{ const el=m.querySelector("#ideaIn"); addIdea(el.value); el.value=""; el.focus(); };
+  m.querySelector("#ideaIn").onkeydown=e=>{ if(e.key==="Enter"){ addIdea(e.target.value); e.target.value=""; } };
+  m.querySelector("#savePrompt").onclick=()=>{ const el=m.querySelector("#promptAns");
+    if(el.value.trim()){ addIdea("["+PROMPTS[promptIdx]+"] "+el.value); el.value=""; toast("Als Idee gespeichert."); } };
+  m.querySelector("#nextPrompt").onclick=()=>{ p.ideas.push(); // no-op to change count parity
+    p._pskip=(p._pskip||0)+1; renderNextPrompt(m,p); };
+  m.querySelectorAll("[data-beat]").forEach(t=>t.oninput=debounce(e=>{
+    if(!p.structure)p.structure=[]; p.structure[+e.target.dataset.beat]=e.target.value; save();
+  },400));
+};
+function renderNextPrompt(m,p){
+  const idx=((projWordCount()+p.ideas.length+(p._pskip||0))%PROMPTS.length);
+  m.querySelector(".prompt-box .q").textContent="💭 "+PROMPTS[idx];
+  m.querySelector("#savePrompt").onclick=()=>{ const el=m.querySelector("#promptAns");
+    if(el.value.trim()){ p.ideas.unshift({id:uid(),text:"["+PROMPTS[idx]+"] "+el.value,done:false}); save(); el.value=""; toast("Gespeichert."); VIEWS.ideas(); } };
+}
+
+/* ---------- Notizen ---------- */
+VIEWS.notes = ()=>{
+  const p=proj(); const m=mount();
+  m.innerHTML=`<h2>Notizen</h2>
+    <p class="lead">Ein freier Zettelkasten für alles, was sonst nirgends passt – Recherche, offene Fragen, Formulierungen.</p>
+    <textarea class="in" id="notes" style="min-height:60vh;font-family:var(--serif);font-size:16px;line-height:1.7">${esc(p.notes||"")}</textarea>`;
+  m.querySelector("#notes").oninput=debounce(e=>{ p.notes=e.target.value; save(); },400);
+};
+
+/* ============================================================
+   Modal-System
+   ============================================================ */
+function modal(html, onSave, afterMount, noSaveBtn){
+  const root=document.getElementById("modalRoot");
+  root.innerHTML=`<div class="overlay" id="ov"><div class="modal ${html.length>1400?'wide':''}">
+    <div id="mBody">${html}</div>
+    <div class="foot">
+      ${noSaveBtn?"":`<button class="btn ghost" id="mCancel">Abbrechen</button><button class="btn primary" id="mSave">Speichern</button>`}
+    </div></div></div>`;
+  const ov=root.querySelector("#ov");
+  ov.onclick=e=>{ if(e.target===ov) closeModal(); };
+  if(!noSaveBtn){
+    root.querySelector("#mCancel").onclick=closeModal;
+    root.querySelector("#mSave").onclick=()=>{ if(onSave){ const r=onSave(); if(r===false) return; } closeModal(); };
+  }
+  const modalEl=root.querySelector(".modal");
+  if(afterMount) afterMount(modalEl);
+  const first=root.querySelector("input,textarea,select"); if(first) first.focus();
+  document.onkeydown=e=>{ if(e.key==="Escape") closeModal(); };
+}
+function closeModal(){ document.getElementById("modalRoot").innerHTML=""; document.onkeydown=null; }
+window.closeModal=closeModal;
+function val(id){ const el=document.getElementById(id); return el?el.value.trim():""; }
+function mount(){ const m=document.getElementById("main"); m.innerHTML='<div class="view"></div>'; return m.querySelector(".view"); }
+
+/* ---------- Utilities ---------- */
+function debounce(fn,ms){ let t; return function(...a){ clearTimeout(t); t=setTimeout(()=>fn.apply(this,a),ms); }; }
+function autoGrow(ta){
+  const grow=()=>{ ta.style.height="auto"; ta.style.height=Math.max(ta.scrollHeight, window.innerHeight*0.55)+"px"; };
+  ta.addEventListener("input",grow); setTimeout(grow,0);
+}
+
+/* ---------- Projekt-Verwaltung ---------- */
+document.getElementById("btnNewProject").onclick=()=>{
+  modal(`<h3>Neues Projekt</h3>
+    <label class="f"><span class="lbl">Titel der Geschichte</span><input class="in" id="npTitle" placeholder="z. B. Die verlorene Karte"></label>`,
+    ()=>{ const p=newProject(val("npTitle")||"Neues Projekt"); DB.projects[p.id]=p; DB.current=p.id; save(); go("dashboard"); });
+};
+document.getElementById("btnExport").onclick=()=>{
+  const data=JSON.stringify(DB,null,2);
+  const blob=new Blob([data],{type:"application/json"});
+  const a=document.createElement("a"); a.href=URL.createObjectURL(blob);
+  a.download="federwerk-sicherung.json"; a.click();
+  toast("Sicherung heruntergeladen.");
+};
+document.getElementById("btnImport").onclick=()=>document.getElementById("fileInput").click();
+document.getElementById("fileInput").onchange=e=>{
+  const f=e.target.files[0]; if(!f) return;
+  const r=new FileReader();
+  r.onload=()=>{ try{
+    const d=JSON.parse(r.result);
+    if(d.projects&&d.current){ DB=d; save(); go("dashboard"); toast("Sicherung geladen."); }
+    else if(d.id&&d.meta){ DB.projects[d.id]=d; DB.current=d.id; save(); go("dashboard"); toast("Projekt importiert."); }
+    else toast("Datei nicht erkannt.");
+  }catch(err){ toast("Datei konnte nicht gelesen werden."); } };
+  r.readAsText(f); e.target.value="";
+};
+document.getElementById("btnTheme").onclick=()=>{
+  const cur=document.documentElement.getAttribute("data-theme");
+  const next=cur==="dark"?"light":"dark";
+  document.documentElement.setAttribute("data-theme",next);
+  try{ localStorage.setItem("federwerk.theme",next); }catch(e){}
+};
+(function initTheme(){ try{ const t=localStorage.getItem("federwerk.theme"); if(t) document.documentElement.setAttribute("data-theme",t); }catch(e){} })();
+
+/* ---------- Start ---------- */
+render();
+</script>
+</body>
+</html>
