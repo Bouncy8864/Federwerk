@@ -566,13 +566,15 @@ const NAV = [
 ];
 function learnState(){ if(!DB.learn) DB.learn={done:{}}; return DB.learn; }
 function aiState(){
-  if(!DB.ai) DB.ai={provider:"google", key:"", model:"gemini-2.5-flash"};
+  if(!DB.ai) DB.ai={provider:"google", key:"", model:"gemini-flash-latest"};
   if(!DB.ai.provider) DB.ai.provider = (DB.ai.model||"").startsWith("claude")?"anthropic":"google";
+  // Migration: abgeschaltete Gemini-2.x-Modelle auf die aktuelle Flash-Version umstellen
+  if(DB.ai.provider==="google" && /^gemini-2/.test(DB.ai.model||"")) DB.ai.model="gemini-flash-latest";
   return DB.ai;
 }
 const AI_PROVIDERS = {
   google: { label:"Google Gemini (kostenlos)", link:"aistudio.google.com/app/apikey", keyHint:"beginnt meist mit AIza…",
-    models:[["gemini-2.5-flash","Gemini 2.5 Flash – schnell & gratis"],["gemini-2.0-flash","Gemini 2.0 Flash – sehr schnell"],["gemini-2.5-pro","Gemini 2.5 Pro – stärker (knapperes Gratis-Limit)"]] },
+    models:[["gemini-flash-latest","Gemini Flash – immer aktuell, schnell & gratis (empfohlen)"],["gemini-3.5-flash","Gemini 3.5 Flash – feste Version"],["gemini-3.1-flash-lite","Gemini 3.1 Flash-Lite – besonders sparsam"],["gemini-3.1-pro-preview","Gemini 3.1 Pro – stärker (Vorschau, knapperes Limit)"]] },
   anthropic: { label:"Anthropic Claude (API-Schlüssel nötig)", link:"console.anthropic.com", keyHint:"beginnt mit sk-ant-…",
     models:[["claude-opus-4-8","Claude Opus 4.8 – höchste Qualität"],["claude-sonnet-5","Claude Sonnet 5 – guter Kompromiss"],["claude-haiku-4-5","Claude Haiku 4.5 – schnell & günstig"]] },
 };
