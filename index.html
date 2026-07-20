@@ -194,6 +194,58 @@
        padding:10px 14px;margin-bottom:8px;display:flex;align-items:center;gap:10px}
   .suggest .txt{flex:1;font-size:14px}
 
+  /* Lernen */
+  .lesson{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px 18px;
+       margin-bottom:10px;box-shadow:var(--shadow)}
+  .lesson-h{display:flex;align-items:center;gap:12px;cursor:pointer}
+  .lesson-h .ico{font-size:22px;width:30px;text-align:center}
+  .lesson-h .t{flex:1;font-family:var(--serif);font-size:18px;font-weight:600}
+  .lesson-h .chk{width:22px;height:22px;border-radius:50%;border:2px solid var(--line);flex-shrink:0;
+       display:flex;align-items:center;justify-content:center;font-size:13px;color:#fff}
+  .lesson-h .chk.on{background:var(--ok);border-color:var(--ok)}
+  .lesson-body{margin-top:12px;line-height:1.7}
+  .lesson-body p{margin:0 0 10px}
+  .lesson-ex{background:var(--accent-bg);border:1px solid var(--accent-soft);border-radius:8px;
+       padding:12px 14px;margin-top:6px}
+  .lesson-ex .lbl{font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:var(--accent);font-weight:600}
+  .learn-progress{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px 18px;
+       margin-bottom:18px;box-shadow:var(--shadow)}
+  .warmup{background:var(--accent-bg);border:1px solid var(--accent-soft);border-radius:10px;
+       padding:16px 18px;margin-bottom:18px}
+  .warmup .q{font-family:var(--serif);font-size:18px;margin-bottom:10px}
+
+  /* Wizard */
+  .wiz-steps{display:flex;gap:6px;margin-bottom:18px}
+  .wiz-steps .s{flex:1;height:5px;border-radius:3px;background:var(--panel-2)}
+  .wiz-steps .s.on{background:var(--accent)}
+  .wiz-q{font-family:var(--serif);font-size:20px;margin-bottom:4px}
+  .wiz-hint{color:var(--ink-soft);font-size:14px;margin-bottom:12px}
+  .choice{display:block;width:100%;text-align:left;padding:12px 14px;border:1px solid var(--line);
+       border-radius:9px;background:var(--panel);margin-bottom:8px;color:var(--ink)}
+  .choice:hover{border-color:var(--accent-soft);background:var(--panel-2)}
+  .choice.sel{border-color:var(--accent);background:var(--accent-bg)}
+
+  /* KI-Assistent */
+  .chat-wrap{display:flex;flex-direction:column;height:calc(100vh - 0px)}
+  .chat-scroll{flex:1;overflow-y:auto;padding:20px 0}
+  .msg{max-width:660px;margin:0 auto 14px;display:flex;gap:10px}
+  .msg .who{width:30px;height:30px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;
+       justify-content:center;font-size:15px}
+  .msg.user .who{background:var(--panel-2)}
+  .msg.assistant .who{background:var(--accent-bg)}
+  .msg .bubble{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:11px 15px;
+       line-height:1.6;white-space:pre-wrap;flex:1;box-shadow:var(--shadow)}
+  .msg.user .bubble{background:var(--panel-2);border-color:transparent}
+  .chat-input{border-top:1px solid var(--line);padding:12px 0;background:var(--bg)}
+  .chat-input .inner{max-width:680px;margin:0 auto;display:flex;gap:8px;align-items:flex-end}
+  .chat-input textarea{flex:1;border:1px solid var(--line);border-radius:10px;padding:10px 12px;
+       resize:none;min-height:44px;max-height:160px;background:var(--panel);color:var(--ink);font-size:15px}
+  .quick-row{max-width:680px;margin:0 auto 8px;display:flex;flex-wrap:wrap;gap:6px}
+  .quick{padding:5px 11px;border:1px solid var(--line);border-radius:20px;background:var(--panel);
+       font-size:13px;color:var(--ink-soft)}
+  .quick:hover{border-color:var(--accent-soft);color:var(--accent)}
+  .typing{color:var(--ink-soft);font-style:italic}
+
   /* Timeline */
   .tl{position:relative;margin-left:6px;padding-left:26px}
   .tl:before{content:"";position:absolute;left:6px;top:6px;bottom:6px;width:2px;background:var(--line)}
@@ -473,8 +525,12 @@ const NAV = [
   {id:"relations", ico:"🔗", label:"Beziehungen", count:()=>proj().relationships.length},
   {id:"timeline", ico:"📅", label:"Zeitstrahl", count:()=>proj().chapters.reduce((a,c)=>a+c.scenes.length,0)},
   {id:"ideas", ico:"💡", label:"Ideen & Struktur", count:()=>proj().ideas.filter(i=>!i.done).length},
+  {id:"learn", ico:"🎓", label:"Schreiben lernen"},
+  {id:"assistant", ico:"✨", label:"KI-Assistent"},
   {id:"notes", ico:"🗒️", label:"Notizen"},
 ];
+function learnState(){ if(!DB.learn) DB.learn={done:{}}; return DB.learn; }
+function aiState(){ if(!DB.ai) DB.ai={key:"", model:"claude-opus-4-8"}; return DB.ai; }
 
 function renderNav(){
   const nav=document.getElementById("nav");
@@ -1315,6 +1371,12 @@ const PROMPTS = [
   "Wie sieht die Welt am Ende anders aus als am Anfang?",
   "Wer ist der Gegenspieler – und warum hält er sich selbst für im Recht?",
   "Welches Geheimnis verändert alles, wenn es herauskommt?",
+  "Was glaubt deine Figur über sich, das nicht stimmt?",
+  "Welcher Ort in deiner Geschichte erzählt schon für sich eine Stimmung?",
+  "Was würde deine Figur niemals tun – und wie zwingst du sie dazu?",
+  "Welche zwei Figuren wollen dasselbe, aber nur eine kann es bekommen?",
+  "Was hat deine Figur zu verlieren, das sie noch gar nicht kennt?",
+  "Wenn du nur eine einzige Szene zeigen dürftest – welche wäre es?",
 ];
 const BEATS = [
   {t:"Ausgangslage", d:"Zeig die normale Welt deiner Figur – bevor alles ins Rollen kommt."},
@@ -1580,6 +1642,304 @@ function download(content, filename, type){
   const blob=new Blob([content],{type:type+";charset=utf-8"});
   const a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download=filename; a.click();
   setTimeout(()=>URL.revokeObjectURL(a.href),1000); toast("Heruntergeladen: "+filename);
+}
+
+/* ---------- Schreiben lernen ---------- */
+const LESSONS = [
+  {id:"scene", ico:"🎬", title:"Was ist eigentlich eine Szene?",
+   body:["Eine Szene ist der Baustein jeder Geschichte – wie ein kleiner Film mit Anfang und Ende. Das Wichtigste: In einer guten Szene <em>will jemand etwas</em> und <em>etwas steht im Weg</em>. Am Ende hat sich etwas verändert, und sei es nur die Stimmung.",
+     "Wenn du nicht weißt, ob eine Szene funktioniert, frag dich: Wer will hier was? Was hindert ihn? Und ist am Ende irgendetwas anders als am Anfang? Fehlt eine dieser drei Zutaten, fühlt sich die Szene oft flau an."],
+   ex:"Schreib eine kurze Szene (5–8 Sätze): Eine Figur will etwas Konkretes (einen Schlüssel, eine Antwort, ein Ja) – und bekommt es nicht."},
+  {id:"want", ico:"🎯", title:"Figuren, die etwas wollen",
+   body:["Leser folgen keiner Figur, weil sie „interessant“ ist, sondern weil sie <em>etwas will</em>. Der Wunsch ist der Motor. Er darf klein sein (einen Zug erwischen) oder groß (die Wahrheit erfahren) – Hauptsache, er ist konkret.",
+     "Noch stärker wird es, wenn die Figur etwas <em>will</em>, aber etwas anderes <em>braucht</em>. Ein Held will Rache – braucht aber Vergebung. Aus dieser Lücke entstehen die besten Geschichten."],
+   ex:"Gib deiner Hauptfigur einen konkreten Wunsch in einem Satz („X will …“) und eine Angst in einem Satz („X fürchtet …“)."},
+  {id:"show", ico:"👁️", title:"Zeigen statt behaupten",
+   body:["„Er war wütend“ ist eine Behauptung. „Er knallte die Tür so hart zu, dass das Bild von der Wand fiel“ – das zeigt es. Zeigen lässt den Leser selbst fühlen, statt ihm ein Etikett vorzusetzen.",
+     "Du musst nicht alles zeigen – für Nebensächliches ist Behaupten völlig okay („Sie fuhr nach Hause“). Aber die wichtigen Gefühle und Wendepunkte verdienen es, gezeigt zu werden."],
+   ex:"Nimm den Satz „Sie war nervös“ und schreibe ihn neu – ohne das Wort „nervös“ (oder ein Synonym) zu benutzen. Zeig es über Körper, Handlung oder Detail."},
+  {id:"conflict", ico:"⚔️", title:"Konflikt ist kein Streit",
+   body:["Konflikt heißt nicht zwangsläufig Kampf oder Wortgefecht. Konflikt entsteht überall, wo ein Wunsch auf einen Widerstand trifft: eine verschlossene Tür, das eigene Gewissen, ein Missverständnis, die Zeit, die davonläuft.",
+     "Faustregel: Mach es deiner Figur schwerer, nicht leichter. Immer wenn du merkst „das ging jetzt zu glatt“, frag: Was könnte hier schiefgehen?"],
+   ex:"Nimm eine deiner Szenen und füge ein einziges Hindernis hinzu, das der Figur im Weg steht. Verändert das die Szene?"},
+  {id:"dialog", ico:"💬", title:"Dialog, der lebt",
+   body:["Echte Menschen sagen selten geradeheraus, was sie meinen. Guter Dialog hat einen doppelten Boden: Oben reden zwei über das Wetter, darunter geht es um Liebe oder Verrat. Dieser Unterton nennt sich Subtext.",
+     "Kleine Tricks: Nicht jede Frage muss beantwortet werden. Menschen unterbrechen, weichen aus, wechseln das Thema. Und: Lies deine Dialoge laut – was sich hölzern anhört, klingt auch beim Lesen hölzern."],
+   ex:"Schreib ein kurzes Gespräch (6–10 Zeilen), in dem keiner der beiden direkt sagt, was er wirklich will."},
+  {id:"pov", ico:"🔭", title:"Durch wessen Augen?",
+   body:["Die Perspektive (POV) entscheidet, was der Leser weiß und fühlt. Bleib in einer Szene möglichst bei <em>einer</em> Figur – sieh, höre und denke nur, was diese Figur kann. Das schafft Nähe und verhindert Verwirrung.",
+     "Für den Anfang ist es am einfachsten, pro Szene genau eine Perspektivfigur zu wählen (dafür gibt es im Editor das POV-Feld). Wechsle nicht mitten in der Szene den Kopf, in dem du steckst."],
+   ex:"Beschreibe denselben kurzen Moment (z. B. einen Streit) zweimal – einmal aus Sicht der einen, einmal aus Sicht der anderen Figur."},
+  {id:"hook", ico:"🪝", title:"Der erste Satz",
+   body:["Der Anfang muss keine Explosion sein, aber er sollte eine Frage im Kopf des Lesers wecken: Was ist hier los? Was passiert als Nächstes? Beginne möglichst nah an dem Moment, in dem sich etwas verändert – nicht drei Kapitel davor.",
+     "Vermeide es, mit langen Erklärungen oder Wetterberichten zu starten. Wirf uns lieber mitten hinein und erkläre später."],
+   ex:"Schreib drei verschiedene erste Sätze für deine Geschichte. Welcher macht dich selbst am neugierigsten?"},
+  {id:"thread", ico:"🧵", title:"Der rote Faden: „deshalb“ und „aber“",
+   body:["Eine Geschichte ist keine Liste von Ereignissen („und dann… und dann…“). Die Szenen sollten durch <em>Ursache und Wirkung</em> verbunden sein. Ein guter Test: Kannst du deine Handlung mit „deshalb“ und „aber“ verbinden statt mit „und dann“?",
+     "„Sie findet die Karte, <em>aber</em> sie ist unvollständig, <em>deshalb</em> sucht sie den alten Kartografen …“ – das zieht. „Und dann, und dann“ reiht nur auf."],
+   ex:"Fasse deine Handlung in 4–5 Sätzen zusammen und verbinde sie nur mit „deshalb“ und „aber“ – nie mit „und dann“."},
+  {id:"revise", ico:"✂️", title:"Überarbeiten ohne Angst",
+   body:["Erste Entwürfe dürfen schlecht sein – das ist ihr gutes Recht. Niemand schreibt fertig. Trenne das Schreiben (drauflos, mutig) vom Überarbeiten (ruhig, kritisch); beides gleichzeitig lähmt.",
+     "Beim Überarbeiten hilft eine simple Regel: Streiche, was die Szene nicht voranbringt. Oft werden Texte allein dadurch besser, dass man 10 % der Wörter entfernt."],
+   ex:"Nimm eine fertige Szene und streiche rund 10 % der Wörter, ohne dass Sinn verloren geht. Liest sie sich straffer?"},
+];
+const WARMUPS = [
+  "Schreib fünf Minuten ohne abzusetzen über: ein Geräusch, das dich mitten in der Nacht weckt.",
+  "Eine Figur öffnet einen Brief, den sie seit Jahren nicht öffnen wollte. Was steht drin?",
+  "Beschreibe einen Raum nur über das, was fehlt.",
+  "Zwei Menschen an einer Bushaltestelle. Einer will reden, der andere nicht.",
+  "Deine Figur findet einen Gegenstand, der ihr nicht gehört. Was macht sie damit?",
+  "Schreib den Moment, kurz bevor alles schiefgeht – aber halte an, bevor es passiert.",
+  "Ein ganz normaler Morgen. Verändere einen einzigen Satz so, dass etwas nicht stimmt.",
+  "Beschreibe eine Figur nur dadurch, wie sie einen Kaffee bestellt.",
+];
+VIEWS.learn = ()=>{
+  const m=mount(); const ls=learnState(); const done=LESSONS.filter(l=>ls.done[l.id]).length;
+  const pct=Math.round(done/LESSONS.length*100);
+  const wIdx=(done+ (ls._wskip||0))%WARMUPS.length;
+  m.innerHTML=`<h2>Schreiben lernen</h2>
+    <p class="lead">Kleine Lektionen und Übungen fürs Handwerk – Schritt für Schritt, ohne Druck. Es geht nicht um ein großes Werk, sondern ums Üben. Hak eine Lektion ab, wenn du sie gelesen (und am besten die Übung gemacht) hast.</p>
+
+    <div class="learn-progress">
+      <div class="row"><strong>Dein Fortschritt</strong><div class="spacer"></div>
+        <span class="muted">${done} von ${LESSONS.length} Lektionen</span></div>
+      <div class="progressbar" style="margin-top:8px"><i style="width:${pct}%"></i></div>
+    </div>
+
+    <div class="warmup">
+      <div class="q">✍️ Schreibimpuls</div>
+      <div style="margin-bottom:10px">${WARMUPS[wIdx]}</div>
+      <div class="row wrap">
+        <button class="btn" id="wNote">In Notizen übernehmen</button>
+        <button class="btn ghost" id="wNext">Anderer Impuls</button>
+      </div>
+    </div>
+
+    <div class="row" style="margin:22px 0 10px"><h3 style="font-family:var(--serif);margin:0">Neue Geschichte starten</h3></div>
+    <div class="card"><div class="row">
+      <div style="flex:1"><p style="margin:0">Du hast eine vage Idee, weißt aber nicht, wie anfangen? Der Story-Starter führt dich in vier kleinen Schritten von der Idee zu Logline, Prämisse und erster Szene.</p></div>
+      <button class="btn primary" id="startWizard">Story-Starter öffnen</button>
+    </div></div>
+
+    <div class="row" style="margin:24px 0 10px"><h3 style="font-family:var(--serif);margin:0">Mini-Lektionen</h3></div>
+    <div id="lessons"></div>`;
+  m.querySelector("#wNote").onclick=()=>{ proj().notes=(proj().notes?proj().notes+"\n\n":"")+"✍️ "+WARMUPS[wIdx]+"\n"; save(); toast("In Notizen übernommen."); };
+  m.querySelector("#wNext").onclick=()=>{ ls._wskip=(ls._wskip||0)+1; VIEWS.learn(); };
+  m.querySelector("#startWizard").onclick=openStoryStarter;
+  const box=m.querySelector("#lessons");
+  box.innerHTML=LESSONS.map(l=>{
+    const isDone=!!ls.done[l.id];
+    return `<div class="lesson" data-l="${l.id}">
+      <div class="lesson-h" data-toggle="${l.id}">
+        <span class="ico">${l.ico}</span>
+        <span class="t">${l.title}</span>
+        <span class="chk ${isDone?'on':''}" data-done="${l.id}" title="Als gelesen markieren">${isDone?'✓':''}</span>
+      </div>
+      <div class="lesson-body" id="lb_${l.id}" style="display:none">
+        ${l.body.map(x=>`<p>${x}</p>`).join("")}
+        <div class="lesson-ex"><div class="lbl">Übung</div><div style="margin-top:4px">${l.ex}</div></div>
+      </div>
+    </div>`;
+  }).join("");
+  box.querySelectorAll("[data-toggle]").forEach(h=>h.onclick=(e)=>{
+    if(e.target.dataset.done!==undefined) return;
+    const b=box.querySelector("#lb_"+h.dataset.toggle);
+    b.style.display = b.style.display==="none"?"block":"none";
+  });
+  box.querySelectorAll("[data-done]").forEach(c=>c.onclick=(e)=>{
+    e.stopPropagation(); const id=c.dataset.done; ls.done[id]=!ls.done[id]; save(); VIEWS.learn();
+  });
+};
+function openStoryStarter(){
+  const data={idea:"",ideaKind:"",who:"",want:"",problem:"",start:""};
+  let step=0;
+  const steps=[
+    {q:"Woher kommt deine Idee?", hint:"Jede Geschichte fängt mit einem Funken an. Wähl, was am ehesten passt – und beschreib ihn in einem Satz.",
+     kind:["Ein „Was wäre, wenn …?“","Eine Figur, die mir nicht aus dem Kopf geht","Ein Ort oder ein Bild","Ein Gefühl oder eine Frage"], field:"idea", ph:"Beschreibe deinen Funken in einem Satz…"},
+    {q:"Wer steht im Mittelpunkt?", hint:"Wir brauchen jemanden, dem wir folgen. Ein Name reicht fürs Erste – und ein Wunsch.",
+     field:"who", ph:"Name der Hauptfigur", field2:"want", ph2:"Was will diese Figur unbedingt?"},
+    {q:"Was steht im Weg?", hint:"Ohne Widerstand keine Geschichte. Was macht es der Figur schwer, ihren Wunsch zu erfüllen?",
+     field:"problem", ph:"Das Hindernis, der Gegner, das Problem…"},
+    {q:"Wo fängt es an?", hint:"Der Moment, in dem sich das normale Leben der Figur zu verändern beginnt. Nah dran anfangen!",
+     field:"start", ph:"Der erste Moment / die erste Szene in einem Satz…"},
+  ];
+  const render=()=>{
+    const s=steps[step];
+    const kinds = s.kind? `<div style="margin-bottom:14px">${s.kind.map(k=>`<button type="button" class="choice ${data.ideaKind===k?'sel':''}" data-kind="${esc(k)}">${k}</button>`).join("")}</div>`:"";
+    const f2 = s.field2? `<label class="f"><span class="lbl">${s.q2||"Wunsch"}</span><input class="in" id="wz2" value="${esc(data[s.field2]||"")}" placeholder="${esc(s.ph2)}"></label>`:"";
+    modal(`<h3>Story-Starter</h3>
+      <div class="wiz-steps">${steps.map((_,i)=>`<div class="s ${i<=step?'on':''}"></div>`).join("")}</div>
+      <div class="wiz-q">${s.q}</div>
+      <div class="wiz-hint">${s.hint}</div>
+      ${kinds}
+      <label class="f"><span class="lbl">${s.field==="who"?"Name":"Dein Satz"}</span>
+        <input class="in" id="wz1" value="${esc(data[s.field]||"")}" placeholder="${esc(s.ph)}"></label>
+      ${f2}`,
+      null,
+      (root)=>{
+        root.querySelectorAll("[data-kind]").forEach(b=>b.onclick=()=>{ data.ideaKind=b.dataset.kind;
+          root.querySelectorAll(".choice").forEach(x=>x.classList.remove("sel")); b.classList.add("sel"); });
+        const foot=root.querySelector(".foot");
+        foot.innerHTML=`${step>0?'<button class="btn ghost" id="wzBack">Zurück</button>':''}
+          <div class="spacer" style="flex:1"></div>
+          <button class="btn primary" id="wzNext">${step===steps.length-1?"Fertig – Geschichte anlegen":"Weiter"}</button>`;
+        const save1=()=>{ data[s.field]=root.querySelector("#wz1").value; if(s.field2) data[s.field2]=root.querySelector("#wz2").value; };
+        if(step>0) foot.querySelector("#wzBack").onclick=()=>{ save1(); step--; render(); };
+        foot.querySelector("#wzNext").onclick=()=>{ save1();
+          if(step<steps.length-1){ step++; render(); }
+          else finishStoryStarter(data);
+        };
+      }, true);
+  };
+  render();
+}
+function finishStoryStarter(d){
+  const p=proj();
+  const who=d.who.trim()||"die Hauptfigur";
+  const logline=`${who} will ${d.want.trim()||"etwas erreichen"}, aber ${d.problem.trim()||"etwas steht im Weg"}.`;
+  p.meta.logline=logline;
+  p.meta.premise=(d.idea.trim()? d.idea.trim()+"\n\n":"")+`Im Mittelpunkt steht ${who}. Es beginnt: ${d.start.trim()||"…"}`;
+  if(d.who.trim() && !p.characters.some(c=>c.name.toLowerCase()===d.who.trim().toLowerCase())){
+    p.characters.push({id:uid(), name:d.who.trim(), role:"Hauptfigur", goal:d.want.trim(), conflict:d.problem.trim()});
+  }
+  // erste Szene anlegen, falls noch keine Kapitel
+  if(p.chapters.length===0){
+    const sc={id:uid(), title:"Der Anfang", text:"", summary:d.start.trim(), status:"todo"};
+    p.chapters.push({id:uid(), title:"1. Kapitel", scenes:[sc]});
+  }
+  save(); closeModal(); toast("Grundgerüst angelegt – viel Freude beim Schreiben!"); go("dashboard");
+}
+
+/* ---------- KI-Assistent (optional, eigener API-Schlüssel) ---------- */
+let CHAT = []; // {role, content}
+VIEWS.assistant = ()=>{
+  const ai=aiState(); const m=document.getElementById("main");
+  if(!ai.key){
+    const v=mount();
+    v.innerHTML=`<h2>KI-Assistent</h2>
+      <p class="lead">Hol dir einen echten Schreib-Coach direkt ins Tool: Der Assistent kennt deine aktuelle Szene, deine Figuren und deine Prämisse und hilft dir beim Weiterdenken – mit Fragen, Ideen und Feedback.</p>
+      <div class="card" style="max-width:640px">
+        <h3>Einrichten</h3>
+        <p>Der Assistent nutzt <strong>Claude</strong> über deinen eigenen API-Schlüssel von Anthropic. So bleibt alles in deiner Hand.</p>
+        <ol class="muted" style="line-height:1.9;padding-left:20px">
+          <li>Schlüssel erstellen unter <span style="color:var(--accent)">console.anthropic.com</span> → „API Keys".</li>
+          <li>Schlüssel unten einfügen. Er wird nur lokal in deinem Browser gespeichert.</li>
+        </ol>
+        <label class="f"><span class="lbl">Dein API-Schlüssel (beginnt mit sk-ant-…)</span>
+          <input class="in" id="aiKey" type="password" placeholder="sk-ant-…"></label>
+        <label class="f"><span class="lbl">Modell</span>
+          <select class="in" id="aiModel">
+            <option value="claude-opus-4-8">Claude Opus 4.8 – höchste Qualität</option>
+            <option value="claude-sonnet-5">Claude Sonnet 5 – guter Kompromiss</option>
+            <option value="claude-haiku-4-5">Claude Haiku 4.5 – schnell &amp; günstig</option>
+          </select></label>
+        <div class="row" style="margin-top:16px"><button class="btn primary" id="aiSave">Speichern &amp; loslegen</button></div>
+        <p class="muted" style="font-size:12px;margin-top:14px">Hinweis: Jede Anfrage an Claude kostet – je nach Modell – ein paar Cent, abgerechnet über deinen Anthropic-Account. Der Schlüssel verlässt deinen Browser nur, um mit Anthropic zu sprechen. Auf geteilten Rechnern lieber nicht speichern.</p>
+      </div>`;
+    v.querySelector("#aiSave").onclick=()=>{
+      const k=v.querySelector("#aiKey").value.trim();
+      if(!k.startsWith("sk-ant-")){ toast("Bitte einen gültigen Schlüssel (sk-ant-…) einfügen."); return; }
+      ai.key=k; ai.model=v.querySelector("#aiModel").value; save(); CHAT=[]; VIEWS.assistant();
+    };
+    return;
+  }
+  m.innerHTML=`<div class="chat-wrap">
+    <div class="editor-bar"><strong style="font-family:var(--serif);font-size:18px">✨ KI-Assistent</strong>
+      <span class="pill" id="aiModelLbl">${esc(ai.model)}</span>
+      <div class="spacer" style="flex:1"></div>
+      <button class="btn ghost small" id="aiClear">Verlauf leeren</button>
+      <button class="btn ghost small" id="aiSettings">Einstellungen</button></div>
+    <div class="chat-scroll" id="chatScroll"></div>
+    <div class="chat-input">
+      <div class="quick-row" id="quickRow"></div>
+      <div class="inner">
+        <textarea id="chatInput" placeholder="Frag den Assistenten etwas… (z. B. „Wie kann ich diese Szene spannender machen?“)"></textarea>
+        <button class="btn primary" id="chatSend">Senden</button>
+      </div>
+    </div></div>`;
+  const scroll=m.querySelector("#chatScroll");
+  const renderChat=()=>{
+    if(CHAT.length===0){
+      scroll.innerHTML=`<div class="msg assistant"><div class="who">✨</div><div class="bubble">Hallo! Ich bin dein Schreib-Coach. Ich sehe, woran du gerade arbeitest, und helfe dir gern weiter – beim Ideenfinden, beim Vertiefen von Figuren oder mit ehrlichem Feedback. Womit fangen wir an? Nutze gern die Vorschläge unten.</div></div>`;
+    } else {
+      scroll.innerHTML=CHAT.map(msg=>`<div class="msg ${msg.role}">
+        <div class="who">${msg.role==="user"?"🖊️":"✨"}</div>
+        <div class="bubble ${msg.pending?'typing':''}">${esc(msg.content)}</div></div>`).join("");
+    }
+    scroll.scrollTop=scroll.scrollHeight;
+  };
+  renderChat();
+  const quick=[
+    {t:"Feedback zu dieser Szene", m:"Gib mir kurzes, konkretes Feedback zu meiner aktuellen Szene: Was funktioniert, was könnte ich verbessern?"},
+    {t:"Wie geht es weiter?", m:"Ich stecke fest. Schlag mir 3 mögliche Fortsetzungen für die Geschichte vor – als kurze Denkanstöße, nicht ausformuliert."},
+    {t:"Figur vertiefen", m:"Hilf mir, meine Hauptfigur greifbarer zu machen. Stell mir 3–4 gute Fragen zu ihr."},
+    {t:"Idee entwickeln", m:"Aus meiner Prämisse: Welche interessante Frage könnte meine Geschichte stellen? Denk laut mit mir."},
+  ];
+  m.querySelector("#quickRow").innerHTML=quick.map((q,i)=>`<button class="quick" data-q="${i}">${q.t}</button>`).join("");
+  m.querySelectorAll(".quick").forEach(b=>b.onclick=()=>sendToAI(quick[+b.dataset.q].m));
+  const ta=m.querySelector("#chatInput");
+  const send=()=>{ const t=ta.value.trim(); if(t){ ta.value=""; sendToAI(t); } };
+  m.querySelector("#chatSend").onclick=send;
+  ta.onkeydown=e=>{ if(e.key==="Enter"&&!e.shiftKey){ e.preventDefault(); send(); } };
+  m.querySelector("#aiClear").onclick=()=>{ CHAT=[]; renderChat(); };
+  m.querySelector("#aiSettings").onclick=()=>{ ai.key=""; save(); VIEWS.assistant(); };
+
+  async function sendToAI(userText){
+    CHAT.push({role:"user", content:userText});
+    CHAT.push({role:"assistant", content:"denkt nach …", pending:true});
+    renderChat();
+    try{
+      const reply=await callClaude(userText);
+      CHAT.pop();
+      CHAT.push({role:"assistant", content:reply});
+    }catch(err){
+      CHAT.pop();
+      CHAT.push({role:"assistant", content:"⚠️ "+(err.message||"Da ist etwas schiefgelaufen.")});
+    }
+    renderChat();
+  }
+};
+function buildContext(){
+  const p=proj(); const parts=[];
+  parts.push(`Titel des Projekts: ${p.meta.title}`);
+  if(p.meta.genre) parts.push(`Genre: ${p.meta.genre}`);
+  if(p.meta.logline) parts.push(`Logline: ${p.meta.logline}`);
+  if(p.meta.premise) parts.push(`Prämisse: ${p.meta.premise}`);
+  if(p.characters.length) parts.push("Figuren: "+p.characters.map(c=>c.name+(c.role?` (${c.role})`:"")+(c.goal?` – will: ${c.goal}`:"")).join("; "));
+  if(p.places.length) parts.push("Orte: "+p.places.map(pl=>pl.name).join(", "));
+  // aktuelle Szene
+  if(EDIT_SCENE){
+    const ch=p.chapters.find(c=>c.id===EDIT_SCENE.chapterId);
+    const sc=ch&&ch.scenes.find(s=>s.id===EDIT_SCENE.sceneId);
+    if(sc){ parts.push(`\nAktuelle Szene „${sc.title||"ohne Titel"}"`+(sc.summary?` (${sc.summary})`:"")+":\n"+(sc.text||"(noch leer)").slice(0,3000)); }
+  }
+  return parts.join("\n");
+}
+async function callClaude(userText){
+  const ai=aiState();
+  const system=`Du bist ein warmherziger, ermutigender Schreib-Coach für absolute Anfängerinnen und Anfänger. Du hilfst beim Lernen des Handwerks und beim Entwickeln von Geschichten. Antworte auf Deutsch, kurz und konkret. Stelle gute Rückfragen, gib umsetzbare Hinweise und Beispiele. Schreibe die Geschichte NICHT für die Person – hilf ihr, es selbst zu tun, außer sie bittet ausdrücklich um einen Textvorschlag. Beziehe dich, wo sinnvoll, auf den folgenden Kontext ihres aktuellen Projekts:\n\n`+buildContext();
+  const messages=CHAT.filter(x=>!x.pending).map(x=>({role:x.role, content:x.content}));
+  const res=await fetch("https://api.anthropic.com/v1/messages",{
+    method:"POST",
+    headers:{
+      "content-type":"application/json",
+      "x-api-key":ai.key,
+      "anthropic-version":"2023-06-01",
+      "anthropic-dangerous-direct-browser-access":"true"
+    },
+    body:JSON.stringify({ model:ai.model, max_tokens:1200, system, messages })
+  });
+  if(!res.ok){
+    let msg="Fehler "+res.status;
+    try{ const e=await res.json(); if(e.error&&e.error.message) msg=e.error.message; }catch(_){}
+    if(res.status===401) msg="Der API-Schlüssel wird nicht akzeptiert. Bitte in den Einstellungen prüfen.";
+    if(res.status===429) msg="Zu viele Anfragen oder Guthaben aufgebraucht. Bitte später erneut versuchen.";
+    throw new Error(msg);
+  }
+  const data=await res.json();
+  if(data.stop_reason==="refusal") return "Zu dieser Anfrage kann ich leider nichts sagen. Formulier sie gern anders.";
+  const txt=(data.content||[]).filter(b=>b.type==="text").map(b=>b.text).join("\n").trim();
+  return txt||"(keine Antwort erhalten)";
 }
 
 /* ---------- Notizen ---------- */

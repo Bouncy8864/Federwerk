@@ -55,6 +55,17 @@ Internet geschickt** – alles läuft nur bei dir.
   kannst du nach Strang filtern, im Manuskript zeigt ein farbiger Balken den Strang.
 - **Ideen & Struktur** – Ein Ideenspeicher plus Leitfragen, die dir helfen, aus
   einem Einfall eine Geschichte zu machen, und eine einfache Struktur in 7 Schritten.
+- **Schreiben lernen** – Ein Einsteiger-Bereich fürs Handwerk: Mini-Lektionen mit
+  kleinen Übungen (Szene, Figuren-Wünsche, Zeigen statt Behaupten, Dialog,
+  Perspektive, roter Faden, Überarbeiten …) mit Fortschrittsanzeige, wechselnde
+  Schreibimpulse und ein geführter **Story-Starter**, der dich in vier Schritten
+  von der Idee zu Logline, Prämisse, erster Figur und erster Szene bringt.
+- **KI-Assistent (optional)** – Ein Schreib-Coach direkt im Tool. Mit deinem
+  eigenen Claude-API-Schlüssel (von console.anthropic.com) kennt er deine aktuelle
+  Szene, Figuren und Prämisse und hilft dir mit Fragen, Ideen und Feedback.
+  Der Schlüssel wird nur lokal in deinem Browser gespeichert; jede Anfrage läuft
+  über deinen Anthropic-Account. Ohne Schlüssel funktioniert der Rest des Tools
+  vollständig und kostenlos weiter.
 - **Notizen** – ein freier Zettelkasten.
 - **Manuskript-Export** – Über „⤓ Export" im Manuskript verwandelst du deine
   Szenen in ein durchgehendes, lesbares Dokument: als druckfertige Vorschau
