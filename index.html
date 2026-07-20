@@ -195,7 +195,17 @@
   .graph.focused .node.hi{opacity:1}
   .graph.focused .node.hi circle{stroke-width:3}
   .legend{display:flex;flex-wrap:wrap;gap:8px;padding:12px 14px;border-top:1px solid var(--line)}
-  .legend .li{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--ink-soft)}
+  .legend .li{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--ink-soft);
+       cursor:pointer;user-select:none;border:1px solid transparent;border-radius:20px;padding:2px 8px}
+  .legend .li:hover{border-color:var(--line)}
+  .legend .li.off{opacity:.4;text-decoration:line-through}
+  .graph-wrap{position:relative}
+  .graph-zoom{position:absolute;top:8px;right:8px;display:flex;flex-direction:column;gap:5px;z-index:3}
+  .graph-zoom button{width:36px;height:36px;padding:0;font-size:18px;line-height:1;background:var(--panel);
+       border:1px solid var(--line);border-radius:9px;color:var(--ink);box-shadow:var(--shadow);cursor:pointer}
+  .graph-zoom button:hover{border-color:var(--accent-soft);color:var(--accent)}
+  svg.graph{cursor:grab}
+  svg.graph.panning{cursor:grabbing}
   .legend .sw{width:14px;height:4px;border-radius:2px;display:inline-block}
   .rel-cat{width:10px;height:10px;border-radius:50%;display:inline-block;flex-shrink:0}
   .suggest{background:var(--accent-bg);border:1px solid var(--accent-soft);border-radius:10px;
@@ -1151,6 +1161,9 @@ function relationsOf(id){
 }
 let REL_FOCUS = null;   // Fokus-Knoten im Graph
 let REL_CHAPTER = null; // Handlungs-Zeitpunkt (Kapitel-Index) oder null = gesamt
+let REL_LABELS_ALL = false;   // Beschriftungen: alle zeigen oder nur am Fokus
+let REL_HIDDEN = new Set();    // ausgeblendete Kategorien
+let GV = {k:1, tx:0, ty:0};    // Ansicht: Zoom & Verschiebung des Graphen
 VIEWS.relations = ()=>{
   const p=proj(); const m=mount();
   const nodes = [...p.characters, ...p.places, ...p.elements];
@@ -1177,31 +1190,40 @@ VIEWS.relations = ()=>{
   const chapters=p.chapters.filter(c=>c.scenes.length||true);
   const chapterOpts=`<option value="">Aktueller Stand (gesamt)</option>`+
     chapters.map((c,i)=>`<option value="${i}" ${REL_CHAPTER===i?"selected":""}>bis „${esc(c.title||("Kapitel "+(i+1)))}"</option>`).join("");
-  const hasPos=Object.keys(graphPos()).length>0;
+  const firstTime=Object.keys(graphPos()).length===0;
   m.innerHTML+=suggHtml+
-    `<div class="row wrap" style="margin-bottom:12px;gap:10px">
-       ${chapters.length?`<label class="row" style="gap:6px"><span class="muted" style="font-size:13px">🎬 Stand der Handlung:</span>
+    `<div class="row wrap" style="margin-bottom:10px;gap:10px">
+       ${chapters.length?`<label class="row" style="gap:6px"><span class="muted" style="font-size:13px">🎬 Stand:</span>
          <select class="status-sel" id="relChapter">${chapterOpts}</select></label>`:""}
        ${REL_FOCUS?`<span class="pill">Fokus: ${esc(findEntity(REL_FOCUS)?.name||"")}</span>
          <button class="btn ghost small" id="clearFocus">Fokus aufheben</button>`:""}
        <div class="spacer" style="flex:1"></div>
-       ${hasPos?`<button class="btn ghost small" id="resetLayout" title="Knoten wieder im Kreis anordnen">Anordnung zurücksetzen</button>`:""}
+       <label class="row" style="gap:5px;font-size:13px;color:var(--ink-soft)"><input type="checkbox" id="lblAll" ${REL_LABELS_ALL?"checked":""}> alle Beschriftungen</label>
+       <button class="btn ghost small" id="autoArrange" title="Figuren automatisch anordnen">⟳ Auto-anordnen</button>
      </div>
-     ${REL_CHAPTER!==null?`<p class="muted" style="font-size:13px;margin:-4px 0 10px">Zeigt die Beziehungen, wie sie bis zu diesem Kapitel bestehen. Noch nicht entstandene Beziehungen werden ausgeblendet.</p>`:""}
-    <div class="graph-wrap" style="margin-bottom:22px"><div id="graph"></div><div id="legend"></div></div>
-    <p class="muted" style="font-size:12px;margin:-14px 0 20px">Tipp: Figuren im Diagramm lassen sich mit der Maus verschieben. Ein Klick hebt das Geflecht hervor, ein zweiter öffnet die Karteikarte.</p>
+     ${REL_CHAPTER!==null?`<p class="muted" style="font-size:13px;margin:-2px 0 10px">Zeigt die Beziehungen, wie sie bis zu diesem Kapitel bestehen. Noch nicht entstandene werden ausgeblendet.</p>`:""}
+    <div class="graph-wrap" style="margin-bottom:8px">
+      <div id="graph"></div>
+      <div class="graph-zoom"><button id="zIn" title="Vergrößern">＋</button><button id="zOut" title="Verkleinern">－</button><button id="zReset" title="Ansicht zurücksetzen">⤢</button></div>
+      <div id="legend"></div>
+    </div>
+    <p class="muted" style="font-size:12px;margin:0 0 20px">Tipp: Figur ziehen zum Verschieben · leeren Hintergrund ziehen zum Schwenken · Mausrad oder ＋/－ zum Zoomen · unten Kategorien an-/abwählen · ein Klick auf eine Figur hebt ihr Geflecht hervor, ein zweiter öffnet die Karteikarte.</p>
     <h3 style="font-family:var(--serif)">Alle Verbindungen</h3>
     <div id="relList"></div>`;
   m.querySelector("#addRel").onclick=()=>openRelForm(null);
   const cf=m.querySelector("#clearFocus"); if(cf) cf.onclick=()=>{ REL_FOCUS=null; VIEWS.relations(); };
   const rc=m.querySelector("#relChapter"); if(rc) rc.onchange=e=>{ REL_CHAPTER=e.target.value===""?null:+e.target.value; VIEWS.relations(); };
-  const rlBtn=m.querySelector("#resetLayout"); if(rlBtn) rlBtn.onclick=()=>{ p.graphPos={}; save(); VIEWS.relations(); };
   m.querySelectorAll("[data-sugg]").forEach(b=>b.onclick=()=>{ const[a,c]=b.dataset.sugg.split(":"); openRelForm(null,a,c); });
   m.querySelectorAll("[data-ignore]").forEach(b=>b.onclick=()=>{
     if(!p._ignoredSugg) p._ignoredSugg=[]; p._ignoredSugg.push(b.dataset.ignore); save(); VIEWS.relations();
   });
-  drawGraph(document.getElementById("graph"), nodes);
-  renderLegend(document.getElementById("legend"));
+  const redraw=(layout)=>{
+    drawGraph(document.getElementById("graph"), nodes, layout);
+    renderLegend(document.getElementById("legend"), ()=>redraw(false));
+  };
+  m.querySelector("#lblAll").onchange=e=>{ REL_LABELS_ALL=e.target.checked; redraw(false); };
+  m.querySelector("#autoArrange").onclick=()=>redraw(true);
+  redraw(firstTime);
   const rl=m.querySelector("#relList");
   if(p.relationships.length===0){ rl.innerHTML='<p class="muted">Noch keine Beziehungen angelegt.</p>'; }
   else rl.innerHTML=p.relationships.map(r=>{
@@ -1243,12 +1265,19 @@ function coappearanceSuggestions(){
     .filter(s=>s.a&&s.b)
     .sort((x,y)=>y.count-x.count).slice(0,5);
 }
-function renderLegend(el){
+function renderLegend(el, onToggle){
   const used=new Set(proj().relationships.map(r=>r.category||"other"));
   if(!used.size){ el.innerHTML=""; return; }
   el.className="legend";
-  el.innerHTML=REL_CATEGORIES.filter(c=>used.has(c.id)).map(c=>
-    `<span class="li"><span class="sw" style="background:${c.color}"></span>${c.label}</span>`).join("");
+  el.innerHTML=`<span class="muted" style="font-size:12px;align-self:center">Filter:</span>`+
+    REL_CATEGORIES.filter(c=>used.has(c.id)).map(c=>
+      `<span class="li ${REL_HIDDEN.has(c.id)?'off':''}" data-cat="${c.id}" title="An-/Abwählen">
+        <span class="sw" style="background:${c.color}"></span>${c.label}</span>`).join("");
+  el.querySelectorAll("[data-cat]").forEach(chip=>chip.onclick=()=>{
+    const id=chip.dataset.cat;
+    if(REL_HIDDEN.has(id)) REL_HIDDEN.delete(id); else REL_HIDDEN.add(id);
+    if(onToggle) onToggle();
+  });
 }
 function openRelForm(relId, presetFrom, presetTo){
   const p=proj();
@@ -1324,102 +1353,150 @@ function openRelForm(relId, presetFrom, presetTo){
     });
   function readStages(){ const root=document.querySelector("#modalRoot .modal"); return root&&root._readStages?root._readStages():[]; }
 }
-function drawGraph(container, nodes){
+let _graphRaf=null;
+function drawGraph(container, nodes, doLayout){
+  if(_graphRaf){ cancelAnimationFrame(_graphRaf); _graphRaf=null; }
   const p=proj(); const gp=graphPos();
-  const W=container.clientWidth||760, H=Math.max(340, Math.min(600, 160+nodes.length*26));
-  const cx=W/2, cy=H/2, R=Math.min(W,H)/2-72;
+  const W=container.clientWidth||760, H=Math.max(360, Math.min(620, 180+nodes.length*24));
+  const NR=22;
+  // Startpositionen: gespeicherte nutzen, fehlende nahe der Mitte platzieren
   const pos={};
   nodes.forEach((n,i)=>{
-    if(gp[n.id]){ pos[n.id]={x:gp[n.id].x*W, y:gp[n.id].y*H}; }
-    else{ const ang=(i/nodes.length)*Math.PI*2 - Math.PI/2;
-      pos[n.id]={x:cx+R*Math.cos(ang), y:cy+R*Math.sin(ang)}; }
+    if(gp[n.id]) pos[n.id]={x:gp[n.id].x*W, y:gp[n.id].y*H};
+    else{ const ang=(i/nodes.length)*Math.PI*2; pos[n.id]={x:W/2+Math.cos(ang)*40+(i%5)*3, y:H/2+Math.sin(ang)*40+(i%3)*3}; }
   });
-  // effektive Zustände je Beziehung zum gewählten Handlungs-Stand
-  const eff={};
-  p.relationships.forEach(r=>{ eff[r.id]=effectiveRel(r, REL_CHAPTER); });
-  const visibleRels=p.relationships.filter(r=>pos[r.from]&&pos[r.to]&&eff[r.id].visible);
+  const eff={}; p.relationships.forEach(r=>{ eff[r.id]=effectiveRel(r, REL_CHAPTER); });
+  const layoutLinks=p.relationships.filter(r=>pos[r.from]&&pos[r.to]);
+  const visibleRels=p.relationships.filter(r=>pos[r.from]&&pos[r.to]&&eff[r.id].visible && !REL_HIDDEN.has(r.category||"other"));
   const focusSet=new Set();
   if(REL_FOCUS){ focusSet.add(REL_FOCUS);
     visibleRels.forEach(r=>{ if(r.from===REL_FOCUS) focusSet.add(r.to); if(r.to===REL_FOCUS) focusSet.add(r.from); }); }
+  const showLabel=(r)=> REL_LABELS_ALL || (REL_FOCUS && (r.from===REL_FOCUS||r.to===REL_FOCUS));
 
   const edgeSvg=(r)=>{
-    const a=pos[r.from], b=pos[r.to]; const e=eff[r.id];
-    const dx=b.x-a.x, dy=b.y-a.y, len=Math.hypot(dx,dy)||1; const ux=dx/len, uy=dy/len;
-    const x1=a.x+ux*24, y1=a.y+uy*24, x2=b.x-ux*26, y2=b.y-uy*26;
-    const mx=(x1+x2)/2, my=(y1+y2)/2;
-    const col=catOf(r.category).color; const w=STRENGTH_WIDTH[e.strength]||3;
+    const e=eff[r.id], col=catOf(r.category).color, w=STRENGTH_WIDTH[e.strength]||3;
     const dash=e.tension==="cold"?'stroke-dasharray="6 4"':'';
     const hi=REL_FOCUS&&(r.from===REL_FOCUS||r.to===REL_FOCUS)?" hi":"";
-    const ah=7+w, ang=Math.atan2(uy,ux);
-    const p1x=x2-ah*Math.cos(ang-0.4), p1y=y2-ah*Math.sin(ang-0.4);
-    const p2x=x2-ah*Math.cos(ang+0.4), p2y=y2-ah*Math.sin(ang+0.4);
     const icon=tensionOf(e.tension).icon;
-    const lbl=((e.label||"")+(icon?" "+icon:"")).slice(0,24);
-    return `<g class="edge-g" data-from="${r.from}" data-to="${r.to}">
-      <line class="edge${hi}" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${col}" stroke-width="${w}" ${dash}></line>
-      <polygon class="arrow${hi}" points="${x2},${y2} ${p1x},${p1y} ${p2x},${p2y}" fill="${col}"></polygon>
-      <text class="edge-label${hi}" x="${mx}" y="${my-5}" text-anchor="middle">${esc(lbl)}</text></g>`;
+    const lbl=showLabel(r)?((e.label||"")+(icon?" "+icon:"")).slice(0,26):"";
+    return `<g class="edge-g" data-from="${r.from}" data-to="${r.to}" data-w="${w}">
+      <line class="edge${hi}" stroke="${col}" stroke-width="${w}" ${dash}></line>
+      <polygon class="arrow${hi}" fill="${col}"></polygon>
+      <text class="edge-label${hi}" text-anchor="middle">${esc(lbl)}</text></g>`;
   };
   const nodeSvg=(n)=>{
-    const pt=pos[n.id]; const isChar=p.characters.some(c=>c.id===n.id);
-    const isElem=p.elements.some(c=>c.id===n.id);
+    const isChar=p.characters.some(c=>c.id===n.id), isElem=p.elements.some(c=>c.id===n.id);
     const lbl=n.name.length>16?n.name.slice(0,15)+"…":n.name;
     const hi=REL_FOCUS&&focusSet.has(n.id)?" hi":"";
     const glyph=isChar?initials(n.name):(isElem?"✦":"◈");
     return `<g class="node${hi}" data-ent="${n.id}">
-      <circle cx="${pt.x}" cy="${pt.y}" r="22"></circle>
-      <text class="glyph" x="${pt.x}" y="${pt.y+4}" text-anchor="middle" font-family="var(--serif)" font-weight="600">${glyph}</text>
-      <text class="name" x="${pt.x}" y="${pt.y+38}" text-anchor="middle">${esc(lbl)}</text></g>`;
+      <circle r="${NR}"></circle>
+      <text class="glyph" text-anchor="middle" font-family="var(--serif)" font-weight="600">${glyph}</text>
+      <text class="name" text-anchor="middle">${esc(lbl)}</text></g>`;
   };
   container.innerHTML=`<svg class="graph ${REL_FOCUS?'focused':''}" viewBox="0 0 ${W} ${H}" style="height:${H}px;touch-action:none">
-    ${visibleRels.map(edgeSvg).join("")}${nodes.map(nodeSvg).join("")}</svg>`;
-  const svg=container.querySelector("svg");
+    <g id="vp">${visibleRels.map(edgeSvg).join("")}${nodes.map(nodeSvg).join("")}</g></svg>`;
+  const svg=container.querySelector("svg"), vp=svg.querySelector("#vp");
+  const applyTransform=()=>vp.setAttribute("transform",`translate(${GV.tx},${GV.ty}) scale(${GV.k})`);
+  applyTransform();
 
-  // Position eines Knotens live aktualisieren (ohne Neuaufbau)
-  const updateNode=(id)=>{
-    const pt=pos[id];
-    const g=svg.querySelector(`.node[data-ent="${id}"]`); if(!g) return;
+  // Geometrie aus pos in die SVG-Elemente schreiben
+  const edgeGeom=(eg)=>{
+    const a=pos[eg.dataset.from], b=pos[eg.dataset.to]; if(!a||!b) return;
+    const dx=b.x-a.x, dy=b.y-a.y, len=Math.hypot(dx,dy)||1, ux=dx/len, uy=dy/len;
+    const x1=a.x+ux*(NR+2), y1=a.y+uy*(NR+2), x2=b.x-ux*(NR+4), y2=b.y-uy*(NR+4);
+    const ln=eg.querySelector("line"); ln.setAttribute("x1",x1);ln.setAttribute("y1",y1);ln.setAttribute("x2",x2);ln.setAttribute("y2",y2);
+    const w=+eg.dataset.w||3, ah=7+w, ang=Math.atan2(uy,ux);
+    eg.querySelector("polygon").setAttribute("points",
+      `${x2},${y2} ${x2-ah*Math.cos(ang-0.4)},${y2-ah*Math.sin(ang-0.4)} ${x2-ah*Math.cos(ang+0.4)},${y2-ah*Math.sin(ang+0.4)}`);
+    const t=eg.querySelector("text"); if(t){ t.setAttribute("x",(x1+x2)/2); t.setAttribute("y",(y1+y2)/2-5); }
+  };
+  const nodeGeom=(g)=>{
+    const pt=pos[g.dataset.ent]; if(!pt) return;
     g.querySelector("circle").setAttribute("cx",pt.x); g.querySelector("circle").setAttribute("cy",pt.y);
     const gl=g.querySelector(".glyph"); gl.setAttribute("x",pt.x); gl.setAttribute("y",pt.y+4);
-    const nm=g.querySelector(".name"); nm.setAttribute("x",pt.x); nm.setAttribute("y",pt.y+38);
-    svg.querySelectorAll(".edge-g").forEach(eg=>{
-      if(eg.dataset.from!==id && eg.dataset.to!==id) return;
-      const a=pos[eg.dataset.from], b=pos[eg.dataset.to];
-      const dx=b.x-a.x, dy=b.y-a.y, len=Math.hypot(dx,dy)||1, ux=dx/len, uy=dy/len;
-      const x1=a.x+ux*24, y1=a.y+uy*24, x2=b.x-ux*26, y2=b.y-uy*26;
-      const ln=eg.querySelector("line"); const w=+ln.getAttribute("stroke-width")||3;
-      ln.setAttribute("x1",x1);ln.setAttribute("y1",y1);ln.setAttribute("x2",x2);ln.setAttribute("y2",y2);
-      const ah=7+w, ang=Math.atan2(uy,ux);
-      eg.querySelector("polygon").setAttribute("points",
-        `${x2},${y2} ${x2-ah*Math.cos(ang-0.4)},${y2-ah*Math.sin(ang-0.4)} ${x2-ah*Math.cos(ang+0.4)},${y2-ah*Math.sin(ang+0.4)}`);
-      const t=eg.querySelector("text"); t.setAttribute("x",(x1+x2)/2); t.setAttribute("y",(y1+y2)/2-5);
-    });
+    const nm=g.querySelector(".name"); nm.setAttribute("x",pt.x); nm.setAttribute("y",pt.y+NR+16);
   };
-  const toSvg=(ev)=>{ const rect=svg.getBoundingClientRect();
-    return { x:(ev.clientX-rect.left)*(W/rect.width), y:(ev.clientY-rect.top)*(H/rect.height) }; };
+  const edgeEls=[...svg.querySelectorAll(".edge-g")], nodeEls=[...svg.querySelectorAll(".node")];
+  const updateAll=()=>{ nodeEls.forEach(nodeGeom); edgeEls.forEach(edgeGeom); };
+  const updateFor=(id)=>{ const g=svg.querySelector(`.node[data-ent="${id}"]`); if(g) nodeGeom(g);
+    edgeEls.forEach(eg=>{ if(eg.dataset.from===id||eg.dataset.to===id) edgeGeom(eg); }); };
+  updateAll();
 
-  let drag=null, moved=false;
-  svg.querySelectorAll(".node").forEach(g=>{
+  const persist=()=>{ nodes.forEach(n=>{ gp[n.id]={x:pos[n.id].x/W, y:pos[n.id].y/H}; }); save(); };
+
+  // ---- Kräfte-Layout (automatische Anordnung) ----
+  function runForce(){
+    const ids=nodes.map(n=>n.id); if(ids.length<2){ persist(); return; }
+    const kRep=(W*H)/Math.max(6,ids.length);
+    const L=Math.max(90, Math.min(170, Math.sqrt((W*H)/ids.length)));
+    let alpha=1;
+    (function tick(){
+      const disp={}; ids.forEach(id=>disp[id]={x:0,y:0});
+      for(let i=0;i<ids.length;i++) for(let j=i+1;j<ids.length;j++){
+        const a=pos[ids[i]], b=pos[ids[j]]; let dx=a.x-b.x, dy=a.y-b.y; let d2=dx*dx+dy*dy;
+        if(d2<1){ d2=1; dx=(i-j); dy=(j-i)||1; }
+        const d=Math.sqrt(d2), f=kRep/d2;
+        disp[ids[i]].x+=dx/d*f; disp[ids[i]].y+=dy/d*f; disp[ids[j]].x-=dx/d*f; disp[ids[j]].y-=dy/d*f;
+      }
+      layoutLinks.forEach(r=>{ const a=pos[r.from], b=pos[r.to];
+        let dx=b.x-a.x, dy=b.y-a.y; const d=Math.hypot(dx,dy)||1; const f=(d-L)*0.02;
+        disp[r.from].x+=dx/d*f; disp[r.from].y+=dy/d*f; disp[r.to].x-=dx/d*f; disp[r.to].y-=dy/d*f; });
+      ids.forEach(id=>{ disp[id].x+=(W/2-pos[id].x)*0.012; disp[id].y+=(H/2-pos[id].y)*0.012; });
+      ids.forEach(id=>{ let mx=disp[id].x*alpha, my=disp[id].y*alpha; const ms=Math.hypot(mx,my);
+        if(ms>28){ mx=mx/ms*28; my=my/ms*28; }
+        pos[id].x=Math.max(NR+4,Math.min(W-NR-4,pos[id].x+mx));
+        pos[id].y=Math.max(NR+4,Math.min(H-NR-18,pos[id].y+my)); });
+      updateAll(); alpha*=0.94;
+      if(alpha>0.03) _graphRaf=requestAnimationFrame(tick);
+      else { _graphRaf=null; persist(); }
+    })();
+  }
+
+  // ---- Koordinaten-Umrechnung (Bildschirm → Welt, zoom-/schwenk-bewusst) ----
+  const toWorld=(ev)=>{ const rect=svg.getBoundingClientRect();
+    const vbx=(ev.clientX-rect.left)*(W/rect.width), vby=(ev.clientY-rect.top)*(H/rect.height);
+    return { x:(vbx-GV.tx)/GV.k, y:(vby-GV.ty)/GV.k }; };
+  const zoomAt=(vbx,vby,factor)=>{ const nk=Math.max(0.35,Math.min(3, GV.k*factor));
+    const wx=(vbx-GV.tx)/GV.k, wy=(vby-GV.ty)/GV.k; GV.k=nk; GV.tx=vbx-wx*nk; GV.ty=vby-wy*nk; applyTransform(); };
+
+  // Knoten ziehen / anklicken
+  let drag=null;
+  nodeEls.forEach(g=>{
     g.style.cursor="grab";
-    g.addEventListener("pointerdown",ev=>{
-      ev.preventDefault(); const id=g.dataset.ent; const s=toSvg(ev);
-      drag={id, dx:s.x-pos[id].x, dy:s.y-pos[id].y}; moved=false;
-      g.setPointerCapture(ev.pointerId); g.style.cursor="grabbing";
-    });
-    g.addEventListener("pointermove",ev=>{
-      if(!drag) return; const s=toSvg(ev);
-      const nx=Math.max(26,Math.min(W-26, s.x-drag.dx)), ny=Math.max(26,Math.min(H-30, s.y-drag.dy));
-      if(Math.abs(nx-pos[drag.id].x)>2||Math.abs(ny-pos[drag.id].y)>2) moved=true;
-      pos[drag.id]={x:nx,y:ny}; updateNode(drag.id);
-    });
-    g.addEventListener("pointerup",ev=>{
-      g.style.cursor="grab";
-      if(drag && moved){ gp[drag.id]={x:pos[drag.id].x/W, y:pos[drag.id].y/H}; save(); VIEWS.relations(); drag=null; return; }
-      // Klick (ohne Ziehen): fokussieren / öffnen
-      const id=g.dataset.ent; drag=null;
-      if(REL_FOCUS===id) openEntity(id); else { REL_FOCUS=id; VIEWS.relations(); }
-    });
+    g.addEventListener("pointerdown",ev=>{ ev.stopPropagation(); ev.preventDefault();
+      const id=g.dataset.ent, w=toWorld(ev); drag={id,ox:w.x-pos[id].x,oy:w.y-pos[id].y,moved:false};
+      g.setPointerCapture(ev.pointerId); g.style.cursor="grabbing"; });
+    g.addEventListener("pointermove",ev=>{ if(!drag) return; const w=toWorld(ev);
+      const nx=Math.max(NR,Math.min(W-NR,w.x-drag.ox)), ny=Math.max(NR,Math.min(H-NR,w.y-drag.oy));
+      if(Math.hypot(nx-pos[drag.id].x,ny-pos[drag.id].y)>1) drag.moved=true;
+      pos[drag.id]={x:nx,y:ny}; updateFor(drag.id); });
+    g.addEventListener("pointerup",ev=>{ g.style.cursor="grab"; const d=drag; drag=null;
+      if(d&&d.moved){ persist(); return; }
+      const id=g.dataset.ent; if(REL_FOCUS===id) openEntity(id); else { REL_FOCUS=id; VIEWS.relations(); } });
   });
+
+  // Hintergrund schwenken / leeren Bereich tippen = Fokus lösen
+  let pan=null;
+  svg.addEventListener("pointerdown",ev=>{ pan={x:ev.clientX,y:ev.clientY,tx:GV.tx,ty:GV.ty,moved:false};
+    svg.classList.add("panning"); svg.setPointerCapture(ev.pointerId); });
+  svg.addEventListener("pointermove",ev=>{ if(!pan) return; const rect=svg.getBoundingClientRect();
+    const dx=(ev.clientX-pan.x)*(W/rect.width), dy=(ev.clientY-pan.y)*(H/rect.height);
+    if(Math.hypot(ev.clientX-pan.x,ev.clientY-pan.y)>3) pan.moved=true;
+    GV.tx=pan.tx+dx; GV.ty=pan.ty+dy; applyTransform(); });
+  svg.addEventListener("pointerup",ev=>{ const wasMoved=pan&&pan.moved; pan=null; svg.classList.remove("panning");
+    if(!wasMoved && REL_FOCUS){ REL_FOCUS=null; VIEWS.relations(); } });
+  svg.addEventListener("wheel",ev=>{ ev.preventDefault(); const rect=svg.getBoundingClientRect();
+    zoomAt((ev.clientX-rect.left)*(W/rect.width),(ev.clientY-rect.top)*(H/rect.height), ev.deltaY<0?1.12:1/1.12);
+  },{passive:false});
+
+  // Zoom-Knöpfe (falls vorhanden)
+  const zi=document.getElementById("zIn"), zo=document.getElementById("zOut"), zr=document.getElementById("zReset");
+  if(zi) zi.onclick=()=>zoomAt(W/2,H/2,1.2);
+  if(zo) zo.onclick=()=>zoomAt(W/2,H/2,1/1.2);
+  if(zr) zr.onclick=()=>{ GV={k:1,tx:0,ty:0}; applyTransform(); };
+
+  if(doLayout) runForce();
 }
 
 /* ---------- Ideen & Struktur ---------- */

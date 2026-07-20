@@ -40,6 +40,12 @@ Schritt-für-Schritt-Anleitung steht in **[`APP-INSTALLIEREN.md`](APP-INSTALLIER
     „Kind von".
   - **Interaktiv**: Klick auf eine Figur im Diagramm hebt ihr Geflecht hervor,
     ein zweiter Klick öffnet ihre Karteikarte.
+  - **Automatische Anordnung**: Ein Kräfte-Layout verteilt die Figuren von
+    selbst, sodass sich nichts überlagert (Knopf „⟳ Auto-anordnen"); Figuren
+    lassen sich weiterhin frei ziehen.
+  - **Übersicht behalten**: Zoom & Verschieben (＋/－, Mausrad, Hintergrund
+    ziehen), Kategorie-Filter (Kategorien unten an-/abwählen) und entzerrte
+    Beschriftungen (nur an der fokussierten Figur, umschaltbar auf „alle").
   - **Automatische Vorschläge**: Figuren, die oft zusammen in Szenen auftauchen,
     aber noch nicht verbunden sind, werden vorgeschlagen.
   - **Gewichtung**: Bindungsstärke (lose / mittel / eng → Liniendicke) und
