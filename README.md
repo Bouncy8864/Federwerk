@@ -66,12 +66,17 @@ Schritt-für-Schritt-Anleitung steht in **[`APP-INSTALLIEREN.md`](APP-INSTALLIER
   Perspektive, roter Faden, Überarbeiten …) mit Fortschrittsanzeige, wechselnde
   Schreibimpulse und ein geführter **Story-Starter**, der dich in vier Schritten
   von der Idee zu Logline, Prämisse, erster Figur und erster Szene bringt.
-- **KI-Assistent (optional)** – Ein Schreib-Coach direkt im Tool. Mit deinem
-  eigenen Claude-API-Schlüssel (von console.anthropic.com) kennt er deine aktuelle
-  Szene, Figuren und Prämisse und hilft dir mit Fragen, Ideen und Feedback.
-  Der Schlüssel wird nur lokal in deinem Browser gespeichert; jede Anfrage läuft
-  über deinen Anthropic-Account. Ohne Schlüssel funktioniert der Rest des Tools
-  vollständig und kostenlos weiter.
+- **KI-Assistent (optional)** – Ein Schreib-Coach direkt im Tool, der deine
+  aktuelle Szene, Figuren und Prämisse kennt und mit Fragen, Ideen und Feedback
+  hilft. Du wählst den Anbieter:
+  - **Google Gemini** – mit kostenlosem API-Schlüssel von aistudio.google.com
+    (gratis Kontingent mit Tageslimits).
+  - **Anthropic Claude** – mit API-Schlüssel von console.anthropic.com
+    (pay-as-you-go; Hinweis: eine reine Claude-*Teams*-Chat-Lizenz enthält
+    **keinen** API-Schlüssel – dafür braucht es einen Console-Zugang).
+
+  Der Schlüssel wird nur lokal in deinem Browser gespeichert. Ohne Schlüssel
+  funktioniert der Rest des Tools vollständig und kostenlos weiter.
 - **Notizen** – ein freier Zettelkasten.
 - **Manuskript-Export** – Über „⤓ Export" im Manuskript verwandelst du deine
   Szenen in ein durchgehendes, lesbares Dokument: als druckfertige Vorschau

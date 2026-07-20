@@ -565,7 +565,17 @@ const NAV = [
   {id:"notes", ico:"🗒️", label:"Notizen"},
 ];
 function learnState(){ if(!DB.learn) DB.learn={done:{}}; return DB.learn; }
-function aiState(){ if(!DB.ai) DB.ai={key:"", model:"claude-opus-4-8"}; return DB.ai; }
+function aiState(){
+  if(!DB.ai) DB.ai={provider:"google", key:"", model:"gemini-2.5-flash"};
+  if(!DB.ai.provider) DB.ai.provider = (DB.ai.model||"").startsWith("claude")?"anthropic":"google";
+  return DB.ai;
+}
+const AI_PROVIDERS = {
+  google: { label:"Google Gemini (kostenlos)", link:"aistudio.google.com/app/apikey", keyHint:"beginnt meist mit AIza…",
+    models:[["gemini-2.5-flash","Gemini 2.5 Flash – schnell & gratis"],["gemini-2.0-flash","Gemini 2.0 Flash – sehr schnell"],["gemini-2.5-pro","Gemini 2.5 Pro – stärker (knapperes Gratis-Limit)"]] },
+  anthropic: { label:"Anthropic Claude (API-Schlüssel nötig)", link:"console.anthropic.com", keyHint:"beginnt mit sk-ant-…",
+    models:[["claude-opus-4-8","Claude Opus 4.8 – höchste Qualität"],["claude-sonnet-5","Claude Sonnet 5 – guter Kompromiss"],["claude-haiku-4-5","Claude Haiku 4.5 – schnell & günstig"]] },
+};
 
 function renderNav(){
   const nav=document.getElementById("nav");
@@ -1858,36 +1868,45 @@ VIEWS.assistant = ()=>{
   const ai=aiState(); const m=document.getElementById("main");
   if(!ai.key){
     const v=mount();
+    const provOpts=Object.entries(AI_PROVIDERS).map(([id,p])=>`<option value="${id}" ${ai.provider===id?"selected":""}>${p.label}</option>`).join("");
     v.innerHTML=`<h2>KI-Assistent</h2>
       <p class="lead">Hol dir einen echten Schreib-Coach direkt ins Tool: Der Assistent kennt deine aktuelle Szene, deine Figuren und deine Prämisse und hilft dir beim Weiterdenken – mit Fragen, Ideen und Feedback.</p>
       <div class="card" style="max-width:640px">
         <h3>Einrichten</h3>
-        <p>Der Assistent nutzt <strong>Claude</strong> über deinen eigenen API-Schlüssel von Anthropic. So bleibt alles in deiner Hand.</p>
-        <ol class="muted" style="line-height:1.9;padding-left:20px">
-          <li>Schlüssel erstellen unter <span style="color:var(--accent)">console.anthropic.com</span> → „API Keys".</li>
-          <li>Schlüssel unten einfügen. Er wird nur lokal in deinem Browser gespeichert.</li>
-        </ol>
-        <label class="f"><span class="lbl">Dein API-Schlüssel (beginnt mit sk-ant-…)</span>
-          <input class="in" id="aiKey" type="password" placeholder="sk-ant-…"></label>
+        <label class="f"><span class="lbl">Anbieter</span>
+          <select class="in" id="aiProvider">${provOpts}</select></label>
+        <p class="muted" id="aiIntro" style="margin-top:10px"></p>
+        <label class="f"><span class="lbl" id="aiKeyLbl">Dein API-Schlüssel</span>
+          <input class="in" id="aiKey" type="password" placeholder=""></label>
         <label class="f"><span class="lbl">Modell</span>
-          <select class="in" id="aiModel">
-            <option value="claude-opus-4-8">Claude Opus 4.8 – höchste Qualität</option>
-            <option value="claude-sonnet-5">Claude Sonnet 5 – guter Kompromiss</option>
-            <option value="claude-haiku-4-5">Claude Haiku 4.5 – schnell &amp; günstig</option>
-          </select></label>
+          <select class="in" id="aiModel"></select></label>
         <div class="row" style="margin-top:16px"><button class="btn primary" id="aiSave">Speichern &amp; loslegen</button></div>
-        <p class="muted" style="font-size:12px;margin-top:14px">Hinweis: Jede Anfrage an Claude kostet – je nach Modell – ein paar Cent, abgerechnet über deinen Anthropic-Account. Der Schlüssel verlässt deinen Browser nur, um mit Anthropic zu sprechen. Auf geteilten Rechnern lieber nicht speichern.</p>
+        <p class="muted" style="font-size:12px;margin-top:14px" id="aiFoot"></p>
       </div>`;
+    const provSel=v.querySelector("#aiProvider");
+    const updateProvider=()=>{
+      const pid=provSel.value, cfg=AI_PROVIDERS[pid];
+      v.querySelector("#aiIntro").innerHTML=`Schlüssel erstellen unter <span style="color:var(--accent)">${cfg.link}</span> und unten einfügen. Er wird <strong>nur lokal in deinem Browser</strong> gespeichert.`;
+      v.querySelector("#aiKeyLbl").textContent=`Dein API-Schlüssel (${cfg.keyHint})`;
+      v.querySelector("#aiKey").placeholder=cfg.keyHint;
+      v.querySelector("#aiModel").innerHTML=cfg.models.map(([id,lbl])=>`<option value="${id}">${lbl}</option>`).join("");
+      v.querySelector("#aiFoot").innerHTML = pid==="google"
+        ? "Hinweis: Google Gemini bietet ein kostenloses Kontingent (mit Tageslimits). Der Schlüssel verlässt deinen Browser nur, um mit Google zu sprechen. Auf geteilten Geräten lieber nicht speichern."
+        : "Hinweis: Jede Anfrage an Claude kostet ein paar Cent, abgerechnet über deinen Anthropic-Account. Der Schlüssel verlässt deinen Browser nur, um mit Anthropic zu sprechen.";
+    };
+    provSel.onchange=updateProvider; updateProvider();
     v.querySelector("#aiSave").onclick=()=>{
-      const k=v.querySelector("#aiKey").value.trim();
-      if(!k.startsWith("sk-ant-")){ toast("Bitte einen gültigen Schlüssel (sk-ant-…) einfügen."); return; }
-      ai.key=k; ai.model=v.querySelector("#aiModel").value; save(); CHAT=[]; VIEWS.assistant();
+      const pid=provSel.value; const k=v.querySelector("#aiKey").value.trim();
+      if(!k){ toast("Bitte einen Schlüssel einfügen."); return; }
+      if(pid==="anthropic" && !k.startsWith("sk-ant-")){ toast("Claude-Schlüssel beginnen mit sk-ant-…"); return; }
+      ai.provider=pid; ai.key=k; ai.model=v.querySelector("#aiModel").value; save(); CHAT=[]; VIEWS.assistant();
     };
     return;
   }
+  const provLabel = ai.provider==="google" ? "Gemini" : "Claude";
   m.innerHTML=`<div class="chat-wrap">
     <div class="editor-bar"><strong style="font-family:var(--serif);font-size:18px">✨ KI-Assistent</strong>
-      <span class="pill" id="aiModelLbl">${esc(ai.model)}</span>
+      <span class="pill" id="aiModelLbl">${provLabel}: ${esc(ai.model)}</span>
       <div class="spacer" style="flex:1"></div>
       <button class="btn ghost small" id="aiClear">Verlauf leeren</button>
       <button class="btn ghost small" id="aiSettings">Einstellungen</button></div>
@@ -1931,7 +1950,7 @@ VIEWS.assistant = ()=>{
     CHAT.push({role:"assistant", content:"denkt nach …", pending:true});
     renderChat();
     try{
-      const reply=await callClaude(userText);
+      const reply=await callAI();
       CHAT.pop();
       CHAT.push({role:"assistant", content:reply});
     }catch(err){
@@ -1957,10 +1976,14 @@ function buildContext(){
   }
   return parts.join("\n");
 }
-async function callClaude(userText){
+const COACH_SYSTEM = `Du bist ein warmherziger, ermutigender Schreib-Coach für absolute Anfängerinnen und Anfänger. Du hilfst beim Lernen des Handwerks und beim Entwickeln von Geschichten. Antworte auf Deutsch, kurz und konkret. Stelle gute Rückfragen, gib umsetzbare Hinweise und Beispiele. Schreibe die Geschichte NICHT für die Person – hilf ihr, es selbst zu tun, außer sie bittet ausdrücklich um einen Textvorschlag. Beziehe dich, wo sinnvoll, auf den folgenden Kontext ihres aktuellen Projekts:\n\n`;
+async function callAI(){
   const ai=aiState();
-  const system=`Du bist ein warmherziger, ermutigender Schreib-Coach für absolute Anfängerinnen und Anfänger. Du hilfst beim Lernen des Handwerks und beim Entwickeln von Geschichten. Antworte auf Deutsch, kurz und konkret. Stelle gute Rückfragen, gib umsetzbare Hinweise und Beispiele. Schreibe die Geschichte NICHT für die Person – hilf ihr, es selbst zu tun, außer sie bittet ausdrücklich um einen Textvorschlag. Beziehe dich, wo sinnvoll, auf den folgenden Kontext ihres aktuellen Projekts:\n\n`+buildContext();
-  const messages=CHAT.filter(x=>!x.pending).map(x=>({role:x.role, content:x.content}));
+  const system=COACH_SYSTEM+buildContext();
+  const convo=CHAT.filter(x=>!x.pending).map(x=>({role:x.role, content:x.content}));
+  return ai.provider==="google" ? callGemini(ai, system, convo) : callAnthropic(ai, system, convo);
+}
+async function callAnthropic(ai, system, convo){
   const res=await fetch("https://api.anthropic.com/v1/messages",{
     method:"POST",
     headers:{
@@ -1969,7 +1992,7 @@ async function callClaude(userText){
       "anthropic-version":"2023-06-01",
       "anthropic-dangerous-direct-browser-access":"true"
     },
-    body:JSON.stringify({ model:ai.model, max_tokens:1200, system, messages })
+    body:JSON.stringify({ model:ai.model, max_tokens:1200, system, messages:convo })
   });
   if(!res.ok){
     let msg="Fehler "+res.status;
@@ -1981,6 +2004,33 @@ async function callClaude(userText){
   const data=await res.json();
   if(data.stop_reason==="refusal") return "Zu dieser Anfrage kann ich leider nichts sagen. Formulier sie gern anders.";
   const txt=(data.content||[]).filter(b=>b.type==="text").map(b=>b.text).join("\n").trim();
+  return txt||"(keine Antwort erhalten)";
+}
+async function callGemini(ai, system, convo){
+  const contents=convo.map(x=>({role: x.role==="assistant"?"model":"user", parts:[{text:x.content}]}));
+  const url=`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(ai.model)}:generateContent?key=${encodeURIComponent(ai.key)}`;
+  const res=await fetch(url,{
+    method:"POST",
+    headers:{"content-type":"application/json"},
+    body:JSON.stringify({
+      systemInstruction:{parts:[{text:system}]},
+      contents,
+      generationConfig:{maxOutputTokens:1200}
+    })
+  });
+  if(!res.ok){
+    let msg="Fehler "+res.status;
+    try{ const e=await res.json(); if(e.error&&e.error.message) msg=e.error.message; }catch(_){}
+    if(res.status===400 && /API key/i.test(msg)) msg="Der API-Schlüssel wird nicht akzeptiert. Bitte in den Einstellungen prüfen.";
+    if(res.status===429) msg="Das kostenlose Gemini-Kontingent ist gerade erschöpft (Tages-/Minutenlimit). Bitte später erneut versuchen.";
+    throw new Error(msg);
+  }
+  const data=await res.json();
+  if(data.promptFeedback && data.promptFeedback.blockReason)
+    return "Zu dieser Anfrage kann ich leider nichts sagen. Formulier sie gern anders.";
+  const cand=(data.candidates||[])[0];
+  if(cand && cand.finishReason==="SAFETY") return "Zu dieser Anfrage kann ich leider nichts sagen. Formulier sie gern anders.";
+  const txt=(cand && cand.content && cand.content.parts||[]).map(p=>p.text||"").join("").trim();
   return txt||"(keine Antwort erhalten)";
 }
 
