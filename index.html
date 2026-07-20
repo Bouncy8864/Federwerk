@@ -333,15 +333,43 @@
   .toast.show{opacity:.95}
   .rel-item{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--line)}
   .rel-item:last-child{border-bottom:0}
+  /* Mobile Kopfleiste + Menü-Schublade (nur auf schmalen Bildschirmen sichtbar) */
+  .mbar{display:none}
+  .scrim{display:none}
   @media(max-width:820px){
     .app{grid-template-columns:1fr}
-    .sidebar{display:none}
-    .ms{grid-template-columns:1fr}
-    .binder{display:none}
+    .mbar{display:flex;align-items:center;gap:10px;position:fixed;top:0;left:0;right:0;height:52px;
+      background:var(--panel);border-bottom:1px solid var(--line);z-index:80;padding:0 8px;
+      padding-top:env(safe-area-inset-top)}
+    .mbar .ham{font-size:24px;line-height:1;background:none;border:0;color:var(--ink);
+      padding:6px 12px;border-radius:8px;cursor:pointer}
+    .mbar .ham:active{background:var(--panel-2)}
+    .mbar .ttl{font-family:var(--serif);font-size:19px;font-weight:600}
+    .main{padding-top:52px}
+    .sidebar{display:flex;position:fixed;top:0;left:0;bottom:0;width:270px;max-width:82vw;z-index:90;
+      transform:translateX(-102%);transition:transform .25s ease;box-shadow:0 0 30px rgba(0,0,0,.3)}
+    .sidebar.open{transform:none}
+    .scrim{display:block;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:85;opacity:0;
+      pointer-events:none;transition:opacity .2s}
+    .scrim.open{opacity:1;pointer-events:auto}
+    /* Manuskript & Chat: Höhe um die Kopfleiste kürzen */
+    .ms{grid-template-columns:1fr;height:calc(100vh - 52px)}
+    .chat-wrap{height:calc(100vh - 52px)}
+    /* Kapitel-Liste gestapelt über dem Editor statt versteckt */
+    .binder{max-height:34vh;overflow-y:auto;border-right:0;border-bottom:1px solid var(--line)}
+    .editor-body textarea{min-height:40vh}
+    /* Sticky-Unterleisten unter die Kopfleiste schieben */
+    .editor-bar{top:0}
+    .search-box{position:sticky;top:0}
   }
 </style>
 </head>
 <body>
+<header class="mbar">
+  <button class="ham" id="menuBtn" aria-label="Menü öffnen">☰</button>
+  <span class="ttl">Federwerk</span>
+</header>
+<div class="scrim" id="scrim"></div>
 <div class="app">
   <aside class="sidebar">
     <div class="brand">
@@ -553,7 +581,14 @@ function renderNav(){
     .map(p=>`<option value="${p.id}" ${p.id===DB.current?"selected":""}>${esc(p.meta.title)}</option>`).join("");
   sel.onchange = ()=>{ DB.current=sel.value; save(); go("dashboard"); };
 }
-function go(view){ VIEW=view; render(); }
+function go(view){ VIEW=view; closeMenu(); render(); }
+function toggleMenu(open){
+  const sb=document.querySelector(".sidebar"), sc=document.getElementById("scrim");
+  if(!sb||!sc) return;
+  const o = open===undefined ? !sb.classList.contains("open") : open;
+  sb.classList.toggle("open", o); sc.classList.toggle("open", o);
+}
+function closeMenu(){ toggleMenu(false); }
 function render(){ ensureDaily(); renderNav(); renderSearchBox(); document.getElementById("main").innerHTML=""; (VIEWS[VIEW]||VIEWS.dashboard)(); }
 
 /* ---------- Globale Suche ---------- */
@@ -2026,6 +2061,13 @@ document.getElementById("btnTheme").onclick=()=>{
 
 /* ---------- Start ---------- */
 render();
+
+/* Mobiles Menü verdrahten */
+(function initMenu(){
+  const btn=document.getElementById("menuBtn"), sc=document.getElementById("scrim");
+  if(btn) btn.onclick=()=>toggleMenu();
+  if(sc) sc.onclick=()=>closeMenu();
+})();
 
 /* ---------- Als App installierbar machen (Service Worker) ---------- */
 if("serviceWorker" in navigator && location.protocol.startsWith("http")){
