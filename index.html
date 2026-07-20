@@ -1465,15 +1465,19 @@ function drawGraph(container, nodes, doLayout){
   nodeEls.forEach(g=>{
     g.style.cursor="grab";
     g.addEventListener("pointerdown",ev=>{ ev.stopPropagation(); ev.preventDefault();
-      const id=g.dataset.ent, w=toWorld(ev); drag={id,ox:w.x-pos[id].x,oy:w.y-pos[id].y,moved:false};
-      g.setPointerCapture(ev.pointerId); g.style.cursor="grabbing"; });
-    g.addEventListener("pointermove",ev=>{ if(!drag) return; const w=toWorld(ev);
+      const id=g.dataset.ent, w=toWorld(ev);
+      drag={id,ox:w.x-pos[id].x,oy:w.y-pos[id].y,sx:ev.clientX,sy:ev.clientY,moved:false};
+      try{ g.setPointerCapture(ev.pointerId); }catch(_){} });
+    g.addEventListener("pointermove",ev=>{ if(!drag) return; ev.stopPropagation();
+      // erst ab ~9 Bildschirm-Pixeln als Ziehen werten (Finger-Toleranz beim Tippen)
+      if(!drag.moved && Math.hypot(ev.clientX-drag.sx, ev.clientY-drag.sy)<9) return;
+      drag.moved=true; g.style.cursor="grabbing"; const w=toWorld(ev);
       const nx=Math.max(NR,Math.min(W-NR,w.x-drag.ox)), ny=Math.max(NR,Math.min(H-NR,w.y-drag.oy));
-      if(Math.hypot(nx-pos[drag.id].x,ny-pos[drag.id].y)>1) drag.moved=true;
       pos[drag.id]={x:nx,y:ny}; updateFor(drag.id); });
-    g.addEventListener("pointerup",ev=>{ g.style.cursor="grab"; const d=drag; drag=null;
+    g.addEventListener("pointerup",ev=>{ ev.stopPropagation(); g.style.cursor="grab"; const d=drag; drag=null;
       if(d&&d.moved){ persist(); return; }
       const id=g.dataset.ent; if(REL_FOCUS===id) openEntity(id); else { REL_FOCUS=id; VIEWS.relations(); } });
+    g.addEventListener("pointercancel",()=>{ if(drag&&drag.moved) persist(); drag=null; g.style.cursor="grab"; });
   });
 
   // Hintergrund schwenken / leeren Bereich tippen = Fokus lösen
@@ -1486,6 +1490,7 @@ function drawGraph(container, nodes, doLayout){
     GV.tx=pan.tx+dx; GV.ty=pan.ty+dy; applyTransform(); });
   svg.addEventListener("pointerup",ev=>{ const wasMoved=pan&&pan.moved; pan=null; svg.classList.remove("panning");
     if(!wasMoved && REL_FOCUS){ REL_FOCUS=null; VIEWS.relations(); } });
+  svg.addEventListener("pointercancel",()=>{ pan=null; svg.classList.remove("panning"); });
   svg.addEventListener("wheel",ev=>{ ev.preventDefault(); const rect=svg.getBoundingClientRect();
     zoomAt((ev.clientX-rect.left)*(W/rect.width),(ev.clientY-rect.top)*(H/rect.height), ev.deltaY<0?1.12:1/1.12);
   },{passive:false});
