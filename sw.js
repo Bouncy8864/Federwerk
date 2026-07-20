@@ -1,7 +1,7 @@
 /* Federwerk Service Worker – macht die App offline nutzbar.
    Beim Ändern der App-Dateien die CACHE-Version erhöhen, damit Nutzer die
    neue Fassung bekommen. */
-const CACHE = "federwerk-v1";
+const CACHE = "federwerk-v2";
 const ASSETS = [
   "./",
   "./index.html",
@@ -28,6 +28,9 @@ self.addEventListener("activate", (e) => {
 // So funktioniert die App auch komplett offline.
 self.addEventListener("fetch", (e) => {
   if (e.request.method !== "GET") return;
+  // Nur eigene App-Dateien behandeln. Fremd-Aufrufe (Google-Anmeldung,
+  // Drive-API, Gemini/Claude) unangetastet ans Netz durchlassen.
+  if (new URL(e.request.url).origin !== self.location.origin) return;
   e.respondWith(
     fetch(e.request)
       .then((res) => {

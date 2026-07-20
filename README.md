@@ -83,6 +83,16 @@ Schritt-für-Schritt-Anleitung steht in **[`APP-INSTALLIEREN.md`](APP-INSTALLIER
   (auch „als PDF speichern"), als HTML- oder als reine Textdatei. Szenen kannst
   du dabei mit ihren Titeln oder mit „* * *" trennen.
 
+## Geräteübergreifende Synchronisierung (optional)
+
+Über **„☁ Sync"** kann Federwerk deine Daten automatisch in deinem eigenen
+**Google Drive** (versteckter App-Ordner) sichern und zwischen Handy und PC
+abgleichen – neueste Änderung gewinnt. Es wird alles synchronisiert, auch der
+API-Schlüssel; die Daten bleiben in deinem eigenen Google-Konto. Die einmalige
+Einrichtung ist in **[`GOOGLE-SYNC-EINRICHTEN.md`](GOOGLE-SYNC-EINRICHTEN.md)**
+Schritt für Schritt beschrieben. Ohne Einrichtung bleibt alles wie gehabt rein
+lokal.
+
 ## Wichtig: Speichern & Sichern
 
 Deine Arbeit wird automatisch im Browser gespeichert (localStorage). Damit nichts

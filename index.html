@@ -11,6 +11,7 @@
 <meta name="apple-mobile-web-app-title" content="Federwerk">
 <link rel="apple-touch-icon" href="./icon-192.png">
 <link rel="icon" type="image/png" href="./icon-192.png">
+<script src="https://accounts.google.com/gsi/client" async defer></script>
 <style>
   :root{
     --bg:#f6f3ec;
@@ -384,6 +385,7 @@
       <button id="btnNewProject">＋ Projekt</button>
       <button id="btnExport">Sichern</button>
       <button id="btnImport">Laden</button>
+      <button id="btnSync">☁ Sync</button>
       <button id="btnTheme">◐ Thema</button>
     </div>
   </aside>
@@ -435,7 +437,12 @@ function load(){
   ];
   return { projects:{[p.id]:p}, current:p.id };
 }
-function save(){ try{ localStorage.setItem(STORE_KEY, JSON.stringify(DB)); }catch(e){ toast("Speichern fehlgeschlagen (Speicher voll?)"); } }
+function persistLocal(){ try{ localStorage.setItem(STORE_KEY, JSON.stringify(DB)); }catch(e){ toast("Speichern fehlgeschlagen (Speicher voll?)"); } }
+function save(){
+  if(!SYNC_APPLYING) DB.updatedAt = Date.now();  // Zeitstempel für den Cloud-Abgleich
+  persistLocal();
+  if(!SYNC_APPLYING) scheduleCloudPush();
+}
 function proj(){ return DB.projects[DB.current]; }
 
 /* ---------- Hilfen ---------- */
@@ -2103,6 +2110,7 @@ document.getElementById("fileInput").onchange=e=>{
   }catch(err){ toast("Datei konnte nicht gelesen werden."); } };
   r.readAsText(f); e.target.value="";
 };
+document.getElementById("btnSync").onclick=()=>{ closeMenu(); openSync(); };
 document.getElementById("btnTheme").onclick=()=>{
   const cur=document.documentElement.getAttribute("data-theme");
   const next=cur==="dark"?"light":"dark";
@@ -2111,8 +2119,155 @@ document.getElementById("btnTheme").onclick=()=>{
 };
 (function initTheme(){ try{ const t=localStorage.getItem("federwerk.theme"); if(t) document.documentElement.setAttribute("data-theme",t); }catch(e){} })();
 
+/* ============================================================
+   Cloud-Sync (Google Drive – privater App-Ordner)
+   Client-seitig via Google Identity Services (Token-Flow), kein Server.
+   Es wird die gesamte Datenbank als eine Datei abgeglichen; neueste
+   Änderung gewinnt (Zeitstempel DB.updatedAt).
+   ============================================================ */
+const DRIVE_SCOPE="https://www.googleapis.com/auth/drive.appdata";
+const SYNC_FILENAME="federwerk-sync.json";
+let SYNC_APPLYING=false;         // true, während Remote-Daten übernommen werden (kein Rück-Push)
+let SYNC_TOKEN=null, SYNC_TOKEN_EXP=0, SYNC_TC=null, SYNC_STATUS="", _pushTimer=null;
+
+function syncState(){ if(!DB.sync) DB.sync={clientId:"", fileId:"", enabled:false, lastSync:0}; return DB.sync; }
+function setSyncStatus(s){ SYNC_STATUS=s;
+  const el=document.getElementById("syncStatus"); if(el) el.textContent=s;
+  const btn=document.getElementById("btnSync"); if(btn) btn.textContent = syncState().enabled ? "☁ Sync ✓" : "☁ Sync";
+}
+function googleReady(){ return !!(window.google && google.accounts && google.accounts.oauth2); }
+function whenGoogleReady(timeout){
+  timeout=timeout||8000;
+  return new Promise((res,rej)=>{ const t0=Date.now();
+    (function chk(){ if(googleReady()) return res();
+      if(Date.now()-t0>timeout) return rej(new Error("Google-Dienst nicht geladen (Internet?)."));
+      setTimeout(chk,200); })();
+  });
+}
+function ensureTokenClient(){
+  const s=syncState();
+  if(!googleReady()) throw new Error("Google-Dienst noch nicht bereit – kurz warten.");
+  if(!s.clientId) throw new Error("Bitte zuerst die Google-Client-ID eintragen.");
+  if(!SYNC_TC || SYNC_TC._cid!==s.clientId){
+    SYNC_TC=google.accounts.oauth2.initTokenClient({ client_id:s.clientId, scope:DRIVE_SCOPE, callback:()=>{} });
+    SYNC_TC._cid=s.clientId;
+  }
+  return SYNC_TC;
+}
+function getToken(interactive){
+  return new Promise((resolve,reject)=>{
+    if(SYNC_TOKEN && Date.now()<SYNC_TOKEN_EXP-60000) return resolve(SYNC_TOKEN);
+    let tc; try{ tc=ensureTokenClient(); }catch(e){ return reject(e); }
+    tc.callback=(resp)=>{
+      if(resp && resp.access_token){ SYNC_TOKEN=resp.access_token; SYNC_TOKEN_EXP=Date.now()+((resp.expires_in||3600)*1000); resolve(SYNC_TOKEN); }
+      else reject(new Error("Google-Anmeldung fehlgeschlagen."));
+    };
+    tc.error_callback=(err)=>reject(new Error((err&&err.type)||"Anmeldung abgebrochen."));
+    try{ tc.requestAccessToken({prompt: interactive?"consent":""}); }catch(e){ reject(e); }
+  });
+}
+async function driveFetch(url, opts, token){
+  const r=await fetch(url, Object.assign({}, opts, {headers:Object.assign({}, (opts&&opts.headers)||{}, {Authorization:"Bearer "+token})}));
+  if(r.status===401){ SYNC_TOKEN=null; throw new Error("Sitzung abgelaufen – bitte neu verbinden."); }
+  return r;
+}
+async function driveFindFile(token){
+  const q=encodeURIComponent("name='"+SYNC_FILENAME+"'");
+  const r=await driveFetch("https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&fields=files(id)&q="+q,{},token);
+  if(!r.ok) throw new Error("Drive-Fehler "+r.status); const d=await r.json();
+  return (d.files&&d.files[0])?d.files[0].id:null;
+}
+async function driveCreateFile(token){
+  const r=await driveFetch("https://www.googleapis.com/drive/v3/files",
+    {method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({name:SYNC_FILENAME,parents:["appDataFolder"]})},token);
+  if(!r.ok) throw new Error("Anlegen fehlgeschlagen "+r.status); return (await r.json()).id;
+}
+async function driveWrite(token,id,obj){
+  const r=await driveFetch("https://www.googleapis.com/upload/drive/v3/files/"+id+"?uploadType=media",
+    {method:"PATCH",headers:{"content-type":"application/json"},body:JSON.stringify(obj)},token);
+  if(!r.ok) throw new Error("Upload fehlgeschlagen "+r.status); return true;
+}
+async function driveRead(token,id){
+  const r=await driveFetch("https://www.googleapis.com/drive/v3/files/"+id+"?alt=media",{},token);
+  if(!r.ok) throw new Error("Download fehlgeschlagen "+r.status); return r.json();
+}
+async function syncPush(interactive){
+  const s=syncState(); const token=await getToken(!!interactive);
+  if(!s.fileId){ s.fileId=await driveFindFile(token) || await driveCreateFile(token); }
+  await driveWrite(token,s.fileId,DB);
+  s.lastSync=Date.now(); persistLocal(); setSyncStatus("gesichert · "+timeStr(s.lastSync));
+}
+function applyRemote(remote){
+  SYNC_APPLYING=true;
+  const keepFileId=syncState().fileId;
+  DB=remote;
+  if(!DB.sync) DB.sync={}; DB.sync.fileId=keepFileId; DB.sync.enabled=true;
+  if(!DB.projects || !DB.projects[DB.current]) DB.current=Object.keys(DB.projects||{})[0];
+  persistLocal(); SYNC_APPLYING=false;
+  EDIT_SCENE=null; render();
+}
+async function syncNow(interactive){
+  const s=syncState(); const token=await getToken(!!interactive);
+  if(!s.fileId){ s.fileId=await driveFindFile(token); persistLocal(); }
+  if(!s.fileId){ await syncPush(); return "erstmalig hochgeladen"; }
+  const remote=await driveRead(token,s.fileId);
+  const rT=remote.updatedAt||0, lT=DB.updatedAt||0;
+  if(rT>lT){ applyRemote(remote); setSyncStatus("aus Cloud aktualisiert · "+timeStr(Date.now())); return "aus der Cloud aktualisiert"; }
+  if(lT>rT){ await driveWrite(token,s.fileId,DB); s.lastSync=Date.now(); persistLocal(); setSyncStatus("hochgeladen · "+timeStr(s.lastSync)); return "hochgeladen"; }
+  s.lastSync=Date.now(); persistLocal(); setSyncStatus("aktuell · "+timeStr(s.lastSync)); return "war bereits aktuell";
+}
+function scheduleCloudPush(){
+  const s=syncState(); if(!s.enabled||!s.clientId||!googleReady()) return;
+  clearTimeout(_pushTimer);
+  _pushTimer=setTimeout(()=>{ syncPush().catch(()=>setSyncStatus("Sync pausiert – bitte neu verbinden")); }, 2500);
+}
+function timeStr(ms){ try{ return new Date(ms).toLocaleTimeString("de-DE",{hour:"2-digit",minute:"2-digit"}); }catch(e){ return ""; } }
+
+function openSync(){
+  const s=syncState();
+  modal(`<h3>☁ Cloud-Sync (Google Drive)</h3>
+    <p class="muted" style="margin-top:2px">Sichert deine Daten automatisch in deinem privaten Google-Drive-App-Ordner und gleicht sie geräteübergreifend ab. Einrichtung einmalig – siehe <strong>GOOGLE-SYNC-EINRICHTEN.md</strong>.</p>
+    <label class="f"><span class="lbl">Google OAuth-Client-ID (endet auf .apps.googleusercontent.com)</span>
+      <input class="in" id="syncCid" value="${esc(s.clientId||"")}" placeholder="1234-abc.apps.googleusercontent.com"></label>
+    <div class="row wrap" style="margin-top:14px;gap:8px">
+      <button class="btn primary" id="syncConnect">Mit Google verbinden</button>
+      <button class="btn" id="syncGo">Jetzt synchronisieren</button>
+      <button class="btn ghost" id="syncOff">Verbindung trennen</button>
+    </div>
+    <p class="muted" style="font-size:13px;margin-top:14px" id="syncStatus">${esc(SYNC_STATUS|| (s.enabled?("verbunden"+(s.lastSync?" · zuletzt "+timeStr(s.lastSync):"")):"nicht verbunden"))}</p>
+    <div class="divider"></div>
+    <p class="muted" style="font-size:12px">Es wird alles synchronisiert – auch dein API-Schlüssel. Die Daten liegen nur in deinem eigenen Google-Konto (versteckter App-Ordner). Beim ersten Verbinden zeigt Google ggf. einen „App nicht verifiziert"-Hinweis – bei deiner eigenen App normal, auf „Erweitert → fortfahren" tippen.</p>`,
+    null,
+    (root)=>{
+      root.querySelector(".foot").innerHTML=`<button class="btn ghost" onclick="closeModal()">Schließen</button>`;
+      const saveCid=()=>{ s.clientId=root.querySelector("#syncCid").value.trim(); persistLocal(); };
+      root.querySelector("#syncConnect").onclick=async()=>{
+        saveCid();
+        setSyncStatus("verbinde …");
+        try{ await whenGoogleReady(); await getToken(true); s.enabled=true; persistLocal();
+          const msg=await syncNow(true); setSyncStatus("verbunden · "+msg); toast("Mit Google verbunden."); setSyncStatus(SYNC_STATUS); }
+        catch(e){ setSyncStatus("Fehler: "+(e.message||e)); }
+      };
+      root.querySelector("#syncGo").onclick=async()=>{
+        saveCid(); if(!s.clientId){ setSyncStatus("Bitte zuerst die Client-ID eintragen."); return; }
+        setSyncStatus("synchronisiere …");
+        try{ await whenGoogleReady(); const msg=await syncNow(true); toast("Sync: "+msg); }
+        catch(e){ setSyncStatus("Fehler: "+(e.message||e)); }
+      };
+      root.querySelector("#syncOff").onclick=()=>{ s.enabled=false; SYNC_TOKEN=null; persistLocal(); setSyncStatus("Verbindung getrennt (Daten bleiben erhalten)."); };
+    }, true);
+}
+
 /* ---------- Start ---------- */
 render();
+setSyncStatus(SYNC_STATUS);
+
+/* Auto-Sync beim Start, falls eingerichtet */
+(function autoSync(){
+  const s=syncState(); if(!s.enabled || !s.clientId) return;
+  whenGoogleReady().then(()=>syncNow(false))
+    .then(()=>{}).catch(()=>setSyncStatus("nicht verbunden – bitte unten über ☁ Sync neu verbinden"));
+})();
 
 /* Mobiles Menü verdrahten */
 (function initMenu(){
