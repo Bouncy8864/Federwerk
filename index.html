@@ -2,8 +2,15 @@
 <html lang="de">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Federwerk – Autoren-Werkzeug</title>
+<link rel="manifest" href="./manifest.webmanifest">
+<meta name="theme-color" content="#9a6a3c">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Federwerk">
+<link rel="apple-touch-icon" href="./icon-192.png">
+<link rel="icon" type="image/png" href="./icon-192.png">
 <style>
   :root{
     --bg:#f6f3ec;
@@ -2019,6 +2026,13 @@ document.getElementById("btnTheme").onclick=()=>{
 
 /* ---------- Start ---------- */
 render();
+
+/* ---------- Als App installierbar machen (Service Worker) ---------- */
+if("serviceWorker" in navigator && location.protocol.startsWith("http")){
+  window.addEventListener("load", ()=>{
+    navigator.serviceWorker.register("./sw.js").catch(()=>{ /* offline-Modus optional */ });
+  });
+}
 </script>
 </body>
 </html>

@@ -10,6 +10,12 @@ Figuren- und Ortsdatenbank) – aber bewusst schlank für den Einstieg.
 (Chrome, Firefox, Edge, Safari). Es wird **nichts installiert** und **nichts ins
 Internet geschickt** – alles läuft nur bei dir.
 
+### Als App aufs Handy (Android)
+
+Federwerk ist auch eine **installierbare App** (PWA): App-Icon, Offline-Betrieb,
+Daten lokal auf dem Gerät – ganz ohne Play Store oder Android Studio. Die
+Schritt-für-Schritt-Anleitung steht in **[`APP-INSTALLIEREN.md`](APP-INSTALLIEREN.md)**.
+
 ## Was kann das Tool?
 
 - **Übersicht** – Titel, Logline, Prämisse, Genre und dein Fortschritt auf einen Blick.
