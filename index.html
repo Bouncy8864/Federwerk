@@ -49,6 +49,7 @@
   .brand{padding:16px 18px 12px;border-bottom:1px solid var(--line)}
   .brand h1{margin:0;font-family:var(--serif);font-size:21px;letter-spacing:.3px}
   .brand .sub{color:var(--ink-soft);font-size:12px;margin-top:2px}
+  .brand .ver{font-size:11px;opacity:.7;margin-top:6px;font-variant-numeric:tabular-nums}
   .proj-pick{padding:10px 12px;border-bottom:1px solid var(--line)}
   .proj-pick select{width:100%;padding:7px 8px;border:1px solid var(--line);border-radius:8px;
                     background:var(--panel-2)}
@@ -371,6 +372,8 @@
       padding:6px 12px;border-radius:8px;cursor:pointer}
     .mbar .ham:active{background:var(--panel-2)}
     .mbar .ttl{font-family:var(--serif);font-size:19px;font-weight:600}
+    .mbar .ver{margin-left:auto;font-size:11px;color:var(--ink-soft);opacity:.8;
+      font-variant-numeric:tabular-nums}
     .main{padding-top:52px}
     .sidebar{display:flex;position:fixed;top:0;left:0;bottom:0;width:270px;max-width:82vw;z-index:90;
       transform:translateX(-102%);transition:transform .25s ease;box-shadow:0 0 30px rgba(0,0,0,.3)}
@@ -394,6 +397,7 @@
 <header class="mbar">
   <button class="ham" id="menuBtn" aria-label="Menü öffnen">☰</button>
   <span class="ttl">Federwerk</span>
+  <span class="ver" data-ver></span>
 </header>
 <div class="scrim" id="scrim"></div>
 <div class="app">
@@ -401,6 +405,7 @@
     <div class="brand">
       <h1>Federwerk</h1>
       <div class="sub">Dein Werkzeug für Geschichten &amp; Welten</div>
+      <div class="sub ver" data-ver></div>
     </div>
     <div class="proj-pick">
       <select id="projectSelect" class="in"></select>
@@ -428,6 +433,10 @@
    ============================================================ */
 
 const STORE_KEY = "federwerk.v1";
+/* Sichtbare App-Version – bei jeder Änderung hochzählen. So lässt sich auf
+   jedem Gerät sofort erkennen, ob die neueste Fassung geladen ist. */
+const APP_VERSION = "v5";
+const APP_BUILD = "2026-07-21";
 const uid = () => Math.random().toString(36).slice(2,9) + Date.now().toString(36).slice(-3);
 
 /* ---------- Datenmodell ---------- */
@@ -2408,6 +2417,14 @@ setSyncStatus(SYNC_STATUS);
   const btn=document.getElementById("menuBtn"), sc=document.getElementById("scrim");
   if(btn) btn.onclick=()=>toggleMenu();
   if(sc) sc.onclick=()=>closeMenu();
+})();
+
+/* Versions-Anzeige füllen (zum Erkennen, ob die neueste Fassung geladen ist) */
+(function showVersion(){
+  document.querySelectorAll("[data-ver]").forEach(el=>{
+    el.textContent=APP_VERSION;
+    el.title="Federwerk "+APP_VERSION+" · "+APP_BUILD;
+  });
 })();
 
 /* ---------- Zurück-Knopf (Android) sinnvoll behandeln ----------
