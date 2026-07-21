@@ -23,7 +23,9 @@ Schritt-für-Schritt-Anleitung steht in **[`APP-INSTALLIEREN.md`](APP-INSTALLIER
   Szene hat eine Kurzzusammenfassung, einen Status (Idee / Entwurf / Fertig), eine
   Perspektivfigur (POV) und ein Feld „Wann?" für die Handlungszeit.
   Kapitel und Szenen lassen sich per **Drag & Drop** (am Griff ⠿) umsortieren –
-  auch quer über Kapitel hinweg.
+  auch quer über Kapitel hinweg. Über **„⤢ Fokus"** startest du einen
+  ablenkungsfreien Vollbild-Schreibmodus (nur Textfeld und ✕) – besonders am
+  Handy praktisch, weil der Text bei offener Tastatur den ganzen Platz bekommt.
 - **Zeitstrahl** – Zeigt den Verlauf deiner Handlung in Leserichtung: was wann
   passiert, wer dabei ist und wie weit du bist. Ein Klick springt zur Szene.
 - **Figuren, Orte, Weltelemente** – Karteikarten mit hilfreichen Feldern

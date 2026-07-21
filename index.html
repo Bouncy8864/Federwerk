@@ -171,6 +171,21 @@
             font-size:13px;color:var(--ink-soft)}
   .detected .chip{display:inline-flex;align-items:center;gap:5px;background:var(--accent-bg);
         color:var(--accent);padding:2px 10px;border-radius:20px;margin:2px 4px 2px 0;font-size:12px}
+  /* Fokus-Schreibmodus: ablenkungsfreies Vollbild, nur Text + Schließen */
+  .focusmode{position:fixed;inset:0;height:100dvh;z-index:200;background:var(--panel);
+        display:flex;flex-direction:column}
+  .focusmode .fm-bar{display:flex;align-items:center;gap:12px;padding:10px 14px;
+        padding-top:calc(env(safe-area-inset-top) + 10px);border-bottom:1px solid var(--line)}
+  .focusmode .fm-bar .t{flex:1;font-family:var(--serif);font-size:16px;color:var(--ink-soft);
+        overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .focusmode .fm-bar .wc{font-size:13px;color:var(--ink-soft);white-space:nowrap}
+  .focusmode .fm-close{font-size:22px;line-height:1;background:none;border:0;color:var(--ink);
+        padding:6px 12px;border-radius:8px;cursor:pointer}
+  .focusmode .fm-close:hover{background:var(--panel-2);color:var(--accent)}
+  .focusmode .fm-body{flex:1;display:flex;overflow:auto}
+  .focusmode .fm-body textarea{flex:1;max-width:760px;margin:0 auto;border:0;outline:none;resize:none;
+        background:var(--panel);color:var(--ink);font-family:var(--serif);font-size:19px;line-height:1.8;
+        padding:20px 20px 45vh}
 
   .pill{padding:4px 10px;border-radius:20px;font-size:12px;border:1px solid var(--line);
         background:var(--panel);color:var(--ink-soft)}
@@ -924,6 +939,7 @@ function renderEditor(){
   w.innerHTML=`
     <div class="editor-bar">
       <input class="title" id="scTitle" value="${esc(sc.title||"")}" placeholder="Szenentitel">
+      <button class="btn ghost small" id="focusWrite" title="Fokus-Schreibmodus (nur Text)">⤢ Fokus</button>
       <span class="pill" id="wc">${wordCount(sc.text)} Wörter</span>
       <select class="status-sel" id="scStatus">
         <option value="todo" ${sc.status==="todo"||!sc.status?"selected":""}>· Idee</option>
@@ -952,6 +968,7 @@ function renderEditor(){
   };
   ta.oninput=debounce(upd,250);
   autoGrow(ta);
+  w.querySelector("#focusWrite").onclick=()=>openFocusWrite(sc);
   w.querySelector("#scTitle").oninput=debounce(e=>{ sc.title=e.target.value; save(); renderBinder(); },300);
   w.querySelector("#scSummary").oninput=debounce(e=>{ sc.summary=e.target.value; save(); },400);
   w.querySelector("#scStatus").onchange=e=>{ sc.status=e.target.value; save(); renderBinder(); };
@@ -965,6 +982,24 @@ function renderEditor(){
     if(confirm("Diese Szene löschen?")){ ch.scenes=ch.scenes.filter(s=>s.id!==sc.id); EDIT_SCENE=null; save(); VIEWS.manuscript(); }
   };
   renderDetected(sc);
+}
+function openFocusWrite(sc){
+  const wrap=document.createElement("div"); wrap.className="focusmode";
+  wrap.innerHTML=`<div class="fm-bar">
+      <span class="t">${esc(sc.title||"Szene")}</span>
+      <span class="wc" id="fmWc">${wordCount(sc.text)} Wörter</span>
+      <button class="fm-close" id="fmClose" aria-label="Fokusmodus schließen">✕</button>
+    </div>
+    <div class="fm-body"><textarea id="fmText" placeholder="Schreib einfach los…"></textarea></div>`;
+  document.body.appendChild(wrap);
+  const ta=wrap.querySelector("#fmText"), wc=wrap.querySelector("#fmWc");
+  ta.value=sc.text||"";
+  ta.oninput=debounce(()=>{ sc.text=ta.value; wc.textContent=wordCount(sc.text)+" Wörter"; save(); },300);
+  const prevKey=document.onkeydown;
+  const close=()=>{ sc.text=ta.value; save(); wrap.remove(); document.onkeydown=prevKey; renderEditor(); };
+  wrap.querySelector("#fmClose").onclick=close;
+  document.onkeydown=e=>{ if(e.key==="Escape") close(); };
+  ta.focus(); try{ ta.setSelectionRange(ta.value.length, ta.value.length); }catch(_){}
 }
 function renderDetected(sc){
   const el=document.getElementById("detected"); if(!el) return;
