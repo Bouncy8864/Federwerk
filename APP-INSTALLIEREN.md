@@ -14,7 +14,7 @@ Es sind nur **zwei kleine Schritte** – einmal am Computer, einmal am Handy.
 Damit sich Federwerk als App installieren lässt, muss die Seite über eine
 Internet-Adresse erreichbar sein. Das geht kostenlos über **GitHub Pages**:
 
-1. Öffne dein Repository auf **github.com** (`bouncy8864/prv_authoring`).
+1. Öffne dein Repository auf **github.com** (`bouncy8864/Federwerk`).
 2. Klick oben auf **Settings** (Einstellungen).
 3. Links im Menü auf **Pages**.
 4. Unter **„Build and deployment" → „Source"** wähle **„Deploy from a branch"**.
@@ -22,10 +22,19 @@ Internet-Adresse erreichbar sein. Das geht kostenlos über **GitHub Pages**:
    auswählen, Ordner auf **`/ (root)`** lassen, dann **Save**.
 6. Warte 1–2 Minuten und lade die Seite neu. Oben erscheint deine Adresse, in etwa:
 
-   **`https://bouncy8864.github.io/prv_authoring/`**
+   **`https://bouncy8864.github.io/Federwerk/`**
 
 Diese Adresse ist deine App. (Falls du die Änderungen später in den
 Haupt-Branch zusammenführst, wähle in Schritt 5 einfach diesen Branch.)
+
+> **Wichtig bei Umbenennung des Repos:** GitHub-Pages-Adressen enthalten den
+> Repo-Namen. Benennst du das Repository um, ändert sich auch die App-Adresse
+> (z. B. von `…/prv_authoring/` zu `…/Federwerk/`). Eine bereits installierte
+> App hängt fest an der alten Adresse und bekommt dann **keine Updates mehr**.
+> Dann einmal die alte App entfernen und von der neuen Adresse neu
+> installieren – deine Daten bleiben erhalten, weil sie am selben Host
+> (`bouncy8864.github.io`) hängen, nicht am Pfad. Zur Sicherheit vorher einmal
+> „Sichern" (JSON-Export).
 
 ---
 

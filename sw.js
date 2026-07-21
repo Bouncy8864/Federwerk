@@ -1,7 +1,7 @@
 /* Federwerk Service Worker – macht die App offline nutzbar.
    Beim Ändern der App-Dateien die CACHE-Version erhöhen, damit Nutzer die
    neue Fassung bekommen. */
-const CACHE = "federwerk-v3";
+const CACHE = "federwerk-v4";
 const ASSETS = [
   "./",
   "./index.html",
@@ -32,11 +32,18 @@ self.addEventListener("fetch", (e) => {
   // Drive-API, Gemini/Claude) unangetastet ans Netz durchlassen.
   if (new URL(e.request.url).origin !== self.location.origin) return;
   e.respondWith(
-    fetch(e.request)
-      .then((res) => {
-        const copy = res.clone();
-        caches.open(CACHE).then((c) => c.put(e.request, copy)).catch(() => {});
-        return res;
+    // "follow" holt bei einer Weiterleitung (z. B. nach Repo-Umbenennung)
+    // wirklich das Ziel. Ist die Antwort weitergeleitet, bauen wir eine
+    // saubere, nicht-weitergeleitete Antwort nach – sonst lehnt der Browser
+    // sie bei einer Seiten-Navigation ab und die App bliebe auf dem alten
+    // Cache hängen.
+    fetch(e.request, { redirect: "follow" })
+      .then(async (res) => {
+        const out = res.redirected ? new Response(res.body, {
+          status: res.status, statusText: res.statusText, headers: res.headers
+        }) : res;
+        try { const copy = out.clone(); caches.open(CACHE).then((c) => c.put(e.request, copy)).catch(() => {}); } catch (_) {}
+        return out;
       })
       .catch(() => caches.match(e.request).then((r) => r || caches.match("./index.html")))
   );

@@ -2445,7 +2445,11 @@ setSyncStatus(SYNC_STATUS);
 /* ---------- Als App installierbar machen (Service Worker) ---------- */
 if("serviceWorker" in navigator && location.protocol.startsWith("http")){
   window.addEventListener("load", ()=>{
-    navigator.serviceWorker.register("./sw.js").catch(()=>{ /* offline-Modus optional */ });
+    // updateViaCache:"none" → der Browser prüft sw.js immer frisch am Netz,
+    // damit neue Fassungen zuverlässig ankommen (kein Festhängen auf altem SW).
+    navigator.serviceWorker.register("./sw.js", { updateViaCache:"none" }).then((reg)=>{
+      try{ reg.update(); }catch(_){}
+    }).catch(()=>{ /* offline-Modus optional */ });
   });
 }
 </script>
