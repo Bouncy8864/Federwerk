@@ -602,6 +602,7 @@ function aiState(){
   if(!DB.ai.provider) DB.ai.provider = (DB.ai.model||"").startsWith("claude")?"anthropic":"google";
   // Migration: abgeschaltete Gemini-2.x-Modelle auf die aktuelle Flash-Version umstellen
   if(DB.ai.provider==="google" && /^gemini-2/.test(DB.ai.model||"")) DB.ai.model="gemini-flash-latest";
+  if(!Array.isArray(DB.ai.history)) DB.ai.history=[]; // gespeicherter Chatverlauf
   return DB.ai;
 }
 const AI_PROVIDERS = {
@@ -1990,8 +1991,11 @@ function finishStoryStarter(d){
 
 /* ---------- KI-Assistent (optional, eigener API-Schlüssel) ---------- */
 let CHAT = []; // {role, content}
+function saveChat(){ aiState().history = CHAT.filter(x=>!x.pending).map(({role,content})=>({role,content})); save(); }
 VIEWS.assistant = ()=>{
   const ai=aiState(); const m=document.getElementById("main");
+  // Verlauf aus dem Speicher wiederherstellen (falls vorhanden und CHAT noch leer)
+  if(CHAT.length===0 && ai.history && ai.history.length) CHAT = ai.history.map(({role,content})=>({role,content}));
   if(!ai.key){
     const v=mount();
     const provOpts=Object.entries(AI_PROVIDERS).map(([id,p])=>`<option value="${id}" ${ai.provider===id?"selected":""}>${p.label}</option>`).join("");
@@ -2068,7 +2072,7 @@ VIEWS.assistant = ()=>{
   const send=()=>{ const t=ta.value.trim(); if(t){ ta.value=""; sendToAI(t); } };
   m.querySelector("#chatSend").onclick=send;
   ta.onkeydown=e=>{ if(e.key==="Enter"&&!e.shiftKey){ e.preventDefault(); send(); } };
-  m.querySelector("#aiClear").onclick=()=>{ CHAT=[]; renderChat(); };
+  m.querySelector("#aiClear").onclick=()=>{ CHAT=[]; saveChat(); renderChat(); };
   m.querySelector("#aiSettings").onclick=()=>{ ai.key=""; save(); VIEWS.assistant(); };
 
   async function sendToAI(userText){
@@ -2083,6 +2087,7 @@ VIEWS.assistant = ()=>{
       CHAT.pop();
       CHAT.push({role:"assistant", content:"⚠️ "+(err.message||"Da ist etwas schiefgelaufen.")});
     }
+    saveChat();
     renderChat();
   }
 };
@@ -2228,13 +2233,25 @@ document.getElementById("fileInput").onchange=e=>{
   r.readAsText(f); e.target.value="";
 };
 document.getElementById("btnSync").onclick=()=>{ closeMenu(); openSync(); };
+// Setzt die Farbe der System-/Statusleiste (Android) passend zum aktiven Design,
+// damit sie im Dunkelmodus nicht grell weiß bleibt.
+function updateThemeColor(){
+  try{
+    const c=getComputedStyle(document.documentElement).getPropertyValue("--panel").trim();
+    if(!c) return;
+    let meta=document.querySelector('meta[name="theme-color"]');
+    if(!meta){ meta=document.createElement("meta"); meta.setAttribute("name","theme-color"); document.head.appendChild(meta); }
+    meta.setAttribute("content",c);
+  }catch(e){}
+}
 document.getElementById("btnTheme").onclick=()=>{
   const cur=document.documentElement.getAttribute("data-theme");
   const next=cur==="dark"?"light":"dark";
   document.documentElement.setAttribute("data-theme",next);
   try{ localStorage.setItem("federwerk.theme",next); }catch(e){}
+  updateThemeColor();
 };
-(function initTheme(){ try{ const t=localStorage.getItem("federwerk.theme"); if(t) document.documentElement.setAttribute("data-theme",t); }catch(e){} })();
+(function initTheme(){ try{ const t=localStorage.getItem("federwerk.theme"); if(t) document.documentElement.setAttribute("data-theme",t); }catch(e){} updateThemeColor(); })();
 
 /* ============================================================
    Cloud-Sync (Google Drive – privater App-Ordner)
@@ -2391,6 +2408,38 @@ setSyncStatus(SYNC_STATUS);
   const btn=document.getElementById("menuBtn"), sc=document.getElementById("scrim");
   if(btn) btn.onclick=()=>toggleMenu();
   if(sc) sc.onclick=()=>closeMenu();
+})();
+
+/* ---------- Zurück-Knopf (Android) sinnvoll behandeln ----------
+   In der installierten App soll der Zurück-Knopf offene Ebenen schließen
+   (Fokusmodus → Dialog → Menü) bzw. zur Übersicht springen, statt die
+   Anzeige zu leeren oder die App sofort zu beenden. */
+(function initBackButton(){
+  const standalone = (window.matchMedia && window.matchMedia("(display-mode: standalone)").matches)
+    || window.navigator.standalone === true;
+  if(!standalone) return; // im normalen Browser-Tab nicht eingreifen
+
+  // Schließt genau eine offene Ebene. Gibt true zurück, wenn etwas geschlossen wurde.
+  function handleBack(){
+    const fm=document.querySelector(".focusmode");
+    if(fm){ const c=fm.querySelector("#fmClose"); if(c){ c.click(); return true; } fm.remove(); return true; }
+    const modal=document.getElementById("modalRoot");
+    if(modal && modal.innerHTML.trim()!==""){ closeModal(); return true; }
+    const sb=document.querySelector(".sidebar");
+    if(sb && sb.classList.contains("open")){ closeMenu(); return true; }
+    if(VIEW!=="dashboard"){ go("dashboard"); return true; }
+    return false;
+  }
+
+  // Einen „Puffer"-Eintrag in die Verlaufsliste legen, den der Zurück-Knopf zuerst trifft.
+  try{ history.pushState({fw:1},""); }catch(e){}
+  window.addEventListener("popstate", ()=>{
+    if(handleBack()){
+      // Ebene geschlossen – Puffer erneut setzen, damit der nächste Druck wieder hier landet.
+      try{ history.pushState({fw:1},""); }catch(e){}
+    }
+    // sonst: nichts mehr offen und schon auf der Übersicht → App darf sich schließen.
+  });
 })();
 
 /* ---------- Als App installierbar machen (Service Worker) ---------- */
