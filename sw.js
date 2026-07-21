@@ -1,7 +1,7 @@
 /* Federwerk Service Worker – macht die App offline nutzbar.
    Beim Ändern der App-Dateien die CACHE-Version erhöhen, damit Nutzer die
    neue Fassung bekommen. */
-const CACHE = "federwerk-v5";
+const CACHE = "federwerk-v6";
 const ASSETS = [
   "./",
   "./index.html",

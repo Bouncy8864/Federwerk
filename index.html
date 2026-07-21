@@ -435,8 +435,9 @@
 const STORE_KEY = "federwerk.v1";
 /* Sichtbare App-Version – bei jeder Änderung hochzählen. So lässt sich auf
    jedem Gerät sofort erkennen, ob die neueste Fassung geladen ist. */
-const APP_VERSION = "v5";
+const APP_VERSION = "v6";
 const APP_BUILD = "2026-07-21";
+let FW_GUARD = false; // ist gerade ein History-Puffer für den Zurück-Knopf gesetzt?
 const uid = () => Math.random().toString(36).slice(2,9) + Date.now().toString(36).slice(-3);
 
 /* ---------- Datenmodell ---------- */
@@ -635,12 +636,13 @@ function renderNav(){
     .map(p=>`<option value="${p.id}" ${p.id===DB.current?"selected":""}>${esc(p.meta.title)}</option>`).join("");
   sel.onchange = ()=>{ DB.current=sel.value; save(); go("dashboard"); };
 }
-function go(view){ VIEW=view; closeMenu(); render(); }
+function go(view){ VIEW=view; closeMenu(); render(); fwEnsureGuard(); }
 function toggleMenu(open){
   const sb=document.querySelector(".sidebar"), sc=document.getElementById("scrim");
   if(!sb||!sc) return;
   const o = open===undefined ? !sb.classList.contains("open") : open;
   sb.classList.toggle("open", o); sc.classList.toggle("open", o);
+  if(o) fwEnsureGuard();
 }
 function closeMenu(){ toggleMenu(false); }
 function render(){ ensureDaily(); renderNav(); renderSearchBox(); document.getElementById("main").innerHTML=""; (VIEWS[VIEW]||VIEWS.dashboard)(); }
@@ -1002,6 +1004,7 @@ function openFocusWrite(sc){
     </div>
     <div class="fm-body"><textarea id="fmText" placeholder="Schreib einfach los…"></textarea></div>`;
   document.body.appendChild(wrap);
+  fwEnsureGuard();
   const ta=wrap.querySelector("#fmText"), wc=wrap.querySelector("#fmWc");
   ta.value=sc.text||"";
   ta.oninput=debounce(()=>{ sc.text=ta.value; wc.textContent=wordCount(sc.text)+" Wörter"; save(); },300);
@@ -2194,6 +2197,7 @@ function modal(html, onSave, afterMount, noSaveBtn){
       ${noSaveBtn?"":`<button class="btn ghost" id="mCancel">Abbrechen</button><button class="btn primary" id="mSave">Speichern</button>`}
     </div></div></div>`;
   const ov=root.querySelector("#ov");
+  fwEnsureGuard();
   ov.onclick=e=>{ if(e.target===ov) closeModal(); };
   if(!noSaveBtn){
     root.querySelector("#mCancel").onclick=closeModal;
@@ -2427,37 +2431,45 @@ setSyncStatus(SYNC_STATUS);
   });
 })();
 
-/* ---------- Zurück-Knopf (Android) sinnvoll behandeln ----------
-   In der installierten App soll der Zurück-Knopf offene Ebenen schließen
-   (Fokusmodus → Dialog → Menü) bzw. zur Übersicht springen, statt die
-   Anzeige zu leeren oder die App sofort zu beenden. */
-(function initBackButton(){
-  const standalone = (window.matchMedia && window.matchMedia("(display-mode: standalone)").matches)
-    || window.navigator.standalone === true;
-  if(!standalone) return; // im normalen Browser-Tab nicht eingreifen
+/* ---------- Zurück-Knopf sinnvoll behandeln ----------
+   Der Zurück-Knopf (Android-Systemtaste, Browser-Zurück, Wisch-Geste) soll
+   zuerst offene Ebenen schließen (Fokusmodus → Dialog → Menü) bzw. von einer
+   Unteransicht zur Übersicht springen – statt die Anzeige zu leeren oder die
+   App sofort zu beenden. Nutzt nur die History-API, funktioniert daher in
+   jedem Browser (auch als Firefox-Verknüpfung), nicht nur im Standalone-Modus.
 
-  // Schließt genau eine offene Ebene. Gibt true zurück, wenn etwas geschlossen wurde.
-  function handleBack(){
-    const fm=document.querySelector(".focusmode");
-    if(fm){ const c=fm.querySelector("#fmClose"); if(c){ c.click(); return true; } fm.remove(); return true; }
-    const modal=document.getElementById("modalRoot");
-    if(modal && modal.innerHTML.trim()!==""){ closeModal(); return true; }
-    const sb=document.querySelector(".sidebar");
-    if(sb && sb.classList.contains("open")){ closeMenu(); return true; }
-    if(VIEW!=="dashboard"){ go("dashboard"); return true; }
-    return false;
-  }
-
-  // Einen „Puffer"-Eintrag in die Verlaufsliste legen, den der Zurück-Knopf zuerst trifft.
-  try{ history.pushState({fw:1},""); }catch(e){}
-  window.addEventListener("popstate", ()=>{
-    if(handleBack()){
-      // Ebene geschlossen – Puffer erneut setzen, damit der nächste Druck wieder hier landet.
-      try{ history.pushState({fw:1},""); }catch(e){}
-    }
-    // sonst: nichts mehr offen und schon auf der Übersicht → App darf sich schließen.
-  });
-})();
+   Ein „Puffer"-Eintrag im Verlauf wird nur angelegt, wenn es wirklich etwas zu
+   schließen gibt. So werden normale Browser-Besucher auf der Übersicht nicht
+   am Verlassen der Seite gehindert. Die Hooks fwEnsureGuard() stehen in go(),
+   toggleMenu(), modal() und openFocusWrite(). */
+// Gibt es gerade eine schließbare Ebene (Overlay oder Nicht-Übersicht)?
+function fwHasLayer(){
+  const modal=document.getElementById("modalRoot");
+  return !!document.querySelector(".focusmode")
+    || !!(modal && modal.innerHTML.trim()!=="")
+    || !!document.querySelector(".sidebar.open")
+    || VIEW!=="dashboard";
+}
+// Puffer-Eintrag anlegen, aber nur einen und nur wenn nötig.
+function fwEnsureGuard(){
+  if(!FW_GUARD && fwHasLayer()){ try{ history.pushState({fwGuard:1},""); FW_GUARD=true; }catch(e){} }
+}
+// Genau eine Ebene schließen. true, wenn etwas geschlossen wurde.
+function fwBack(){
+  const fm=document.querySelector(".focusmode");
+  if(fm){ const c=fm.querySelector("#fmClose"); if(c) c.click(); else fm.remove(); return true; }
+  const modal=document.getElementById("modalRoot");
+  if(modal && modal.innerHTML.trim()!==""){ closeModal(); return true; }
+  if(document.querySelector(".sidebar.open")){ closeMenu(); return true; }
+  if(VIEW!=="dashboard"){ go("dashboard"); return true; }
+  return false;
+}
+window.addEventListener("popstate", ()=>{
+  FW_GUARD=false;                 // unser Puffer wurde gerade „verbraucht"
+  const consumed=fwBack();
+  if(consumed) fwEnsureGuard();   // noch etwas offen? → neuen Puffer setzen
+  // sonst: nichts mehr offen und auf der Übersicht → zurück/schließen ist ok
+});
 
 /* ---------- Als App installierbar machen (Service Worker) ---------- */
 if("serviceWorker" in navigator && location.protocol.startsWith("http")){
